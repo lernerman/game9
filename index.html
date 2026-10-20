@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#3b2a1e" />
+<title>משחק 9</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4ede2;
+    --panel: #fffaf2;
+    --ink: #2b211a;
+    --muted: #7a6a5c;
+    --light-sq: #ecd9b8;
+    --dark-sq: #a8754a;
+    --frame: #5a3b24;
+    --red: #d6453d;
+    --red-dark: #8f2420;
+    --blue: #2f6fd0;
+    --blue-dark: #183f80;
+    --accent: #2f9e6a;
+    --shadow: 0 6px 20px rgba(60, 40, 20, .18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1814;
+      --panel: #2a241e;
+      --ink: #f1e8dc;
+      --muted: #b3a493;
+      --frame: #120d09;
+      --shadow: 0 6px 20px rgba(0, 0, 0, .5);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1814;
+    --panel: #2a241e;
+    --ink: #f1e8dc;
+    --muted: #b3a493;
+    --frame: #120d09;
+    --shadow: 0 6px 20px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Varela Round", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding-block: 12px 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    min-height: 100%;
+  }
+  h1 { margin: 4px 0 2px; font-size: 1.8rem; letter-spacing: .02em; }
+  .sub { color: var(--muted); margin: 0 0 12px; font-size: .95rem; }
+  .wrap { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 12px; }
+
+  .status {
+    background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);
+    padding: 10px 14px; display: flex; align-items: center; gap: 10px; min-height: 52px;
+  }
+  .status .chip { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+  .status .text { flex: 1; font-size: 1.05rem; }
+  .status .moves { color: var(--muted); font-size: .85rem; }
+
+  .board-frame {
+    background: var(--frame); padding: 10px; border-radius: 16px; box-shadow: var(--shadow);
+  }
+  .board {
+    direction: ltr;
+    display: grid; grid-template-columns: repeat(8, 1fr);
+    aspect-ratio: 1 / 1; width: 100%;
+    border-radius: 6px; overflow: hidden; position: relative;
+    user-select: none; touch-action: manipulation;
+  }
+  .sq { position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .sq.light { background: var(--light-sq); }
+  .sq.dark { background: var(--dark-sq); }
+  .sq.zone-red::before, .sq.zone-blue::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+  }
+  .sq.zone-red::before { background: rgba(214, 69, 61, .22); }
+  .sq.zone-blue::before { background: rgba(47, 111, 208, .22); }
+  .sq.last::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: rgba(255, 230, 90, .35);
+  }
+
+  .piece {
+    width: 78%; height: 78%; border-radius: 50%; position: relative; z-index: 2;
+    transition: transform .15s ease;
+  }
+  .piece.red {
+    background: radial-gradient(circle at 35% 30%, #ff8a80, var(--red) 55%, var(--red-dark));
+    box-shadow: 0 3px 0 var(--red-dark), 0 4px 8px rgba(0,0,0,.35);
+  }
+  .piece.blue {
+    background: radial-gradient(circle at 35% 30%, #8ab8ff, var(--blue) 55%, var(--blue-dark));
+    box-shadow: 0 3px 0 var(--blue-dark), 0 4px 8px rgba(0,0,0,.35);
+  }
+  .piece::after {
+    content: ""; position: absolute; inset: 22%; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.35);
+  }
+  .piece.selected { transform: translateY(-4px) scale(1.06); outline: 3px solid #ffe45c; outline-offset: 2px; }
+  .piece.movable { cursor: pointer; }
+
+  .hint { position: absolute; z-index: 3; border-radius: 50%; pointer-events: none; }
+  .hint.step { width: 30%; height: 30%; background: rgba(47, 158, 106, .85); }
+  .hint.jump { width: 62%; height: 62%; border: 4px solid rgba(47, 158, 106, .95); background: rgba(47,158,106,.15); }
+
+  .float-piece { position: absolute; z-index: 5; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+  .float-piece .piece { width: 78%; height: 78%; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    font: inherit; border: 0; border-radius: 12px; padding: 10px 14px; cursor: pointer;
+    background: var(--panel); color: var(--ink); box-shadow: var(--shadow);
+    flex: 1; min-width: 0;
+  }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); color: #fff; }
+  #endTurn { display: none; }
+  #endTurn.show { display: block; }
+
+  .rules { background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); padding: 4px 14px; }
+  .rules summary { cursor: pointer; padding: 10px 0; font-weight: bold; }
+  .rules ul { margin: 0 0 12px; padding-inline-start: 20px; line-height: 1.6; }
+
+  /* dialogs */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20, 14, 8, .55);
+    display: none; align-items: center; justify-content: center; padding: 16px; z-index: 20;
+  }
+  .overlay.show { display: flex; }
+  .dialog {
+    background: var(--panel); border-radius: 18px; box-shadow: var(--shadow);
+    padding: 20px; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .dialog h2 { margin: 0; text-align: center; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label.title { color: var(--muted); font-size: .9rem; }
+  .seg { display: flex; gap: 6px; }
+  .seg input { display: none; }
+  .seg label {
+    flex: 1; text-align: center; padding: 10px 6px; border-radius: 10px; cursor: pointer;
+    border: 2px solid rgba(122,106,92,.35);
+  }
+  .seg input:checked + label { border-color: var(--accent); background: rgba(47,158,106,.12); font-weight: bold; }
+  .ai-only.hidden { display: none; }
+  .win-emoji { font-size: 3rem; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>9</h1>
+  <p class="sub">וריאציה של דמקה סינית</p>
+
+  <div class="wrap">
+    <div class="status">
+      <div class="chip" id="turnChip"></div>
+      <div class="text" id="statusText"></div>
+      <div class="moves" id="moveCount"></div>
+    </div>
+
+    <div class="board-frame"><div class="board" id="board"></div></div>
+
+    <div class="controls">
+      <button id="endTurn" class="primary">סיים תור</button>
+      <button id="undoBtn">↩ בטל מהלך</button>
+      <button id="newBtn">משחק חדש</button>
+    </div>
+
+    <details class="rules">
+      <summary>חוקי המשחק</summary>
+      <ul>
+        <li>לכל שחקן 9 חיילים, בריבוע 3×3 בפינה של הלוח. השחקנים מתחילים בפינות מנוגדות.</li>
+        <li>בכל תור מזיזים חייל אחד: צעד אחד לכל כיוון (כולל אלכסון) למשבצת ריקה.</li>
+        <li>או: קפיצה מעל חייל יריב שצמוד אליו (למעלה, למטה, ימינה או שמאלה – לא באלכסון) למשבצת הריקה שמאחוריו.</li>
+        <li>אפשר לשרשר כמה קפיצות ברצף. אפשר לעצור באמצע הרצף עם "סיים תור" או בלחיצה על החייל.</li>
+        <li>אין אכילה – החיילים שקופצים מעליהם נשארים על הלוח.</li>
+        <li>המנצח: הראשון שממלא את כל 9 המשבצות של פינת ההתחלה של היריב (מסומנת בצבע שלו).</li>
+        <li>חוק נגד חסימה (אפשר לכבות בהגדרות המשחק): אם כל 9 משבצות היעד תפוסות ולפחות אחת מהן שלך – ניצחת, גם אם חלק מהמשבצות תפוסות על ידי היריב. כך אי אפשר "לחסום" את היריב לנצח על ידי השארת חייל בפינה שלו.</li>
+      </ul>
+    </details>
+  </div>
+
+  <!-- new game dialog -->
+  <div class="overlay" id="setup">
+    <form class="dialog" id="setupForm">
+      <h2>משחק חדש</h2>
+      <div class="field">
+        <label class="title">מצב משחק</label>
+        <div class="seg">
+          <input type="radio" name="mode" id="m-ai" value="ai" checked><label for="m-ai">נגד המחשב</label>
+          <input type="radio" name="mode" id="m-pvp" value="pvp"><label for="m-pvp">שני שחקנים</label>
+        </div>
+      </div>
+      <div class="field ai-only" id="sideField">
+        <label class="title">אני משחק</label>
+        <div class="seg">
+          <input type="radio" name="side" id="s-red" value="0" checked><label for="s-red">אדום (ראשון)</label>
+          <input type="radio" name="side" id="s-blue" value="1"><label for="s-blue">כחול (שני)</label>
+        </div>
+      </div>
+      <div class="field ai-only" id="levelField">
+        <label class="title">רמת קושי</label>
+        <div class="seg">
+          <input type="radio" name="level" id="l-1" value="1"><label for="l-1">קל</label>
+          <input type="radio" name="level" id="l-2" value="2" checked><label for="l-2">בינוני</label>
+          <input type="radio" name="level" id="l-3" value="3"><label for="l-3">קשה</label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="title">חוק נגד חסימה</label>
+        <div class="seg">
+          <input type="radio" name="anti" id="a-on" value="1" checked><label for="a-on">פעיל</label>
+          <input type="radio" name="anti" id="a-off" value="0"><label for="a-off">כבוי</label>
+        </div>
+      </div>
+      <button type="submit" class="primary">התחל</button>
+    </form>
+  </div>
+
+  <!-- win dialog -->
+  <div class="overlay" id="winBox">
+    <div class="dialog">
+      <div class="win-emoji" id="winEmoji">🏆</div>
+      <h2 id="winText"></h2>
+      <button class="primary" id="againBtn">משחק חדש</button>
+      <button id="viewBtn">הצג את הלוח</button>
+    </div>
+  </div>
+
+<script>
+"use strict";
+// ---------- Engine ----------
+// Board is 8x8, index = r*8 + c, row 0 is the top. Cells: -1 empty, 0 red, 1 blue.
+const N = 8;
+const RED = 0, BLUE = 1, EMPTY = -1;
+const NAMES = ["אדום", "כחול"];
+const COLORS = ["var(--red)", "var(--blue)"];
+
+const zone = (r0, c0) => {
+  const z = [];
+  for (let r = r0; r < r0 + 3; r++) for (let c = c0; c < c0 + 3; c++) z.push(r * N + c);
+  return z;
+};
+// Red starts bottom-left, Blue starts top-right.
+const HOME = [zone(5, 0), zone(0, 5)];
+const TARGET = [HOME[BLUE], HOME[RED]];
+// The far corner each player is heading for, used by the AI's evaluation.
+const GOAL_CORNER = [[0, 7], [7, 0]];
+
+const STEP_DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const JUMP_DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
+const inside = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
+
+function initialBoard() {
+  const b = new Array(N * N).fill(EMPTY);
+  HOME[RED].forEach(i => b[i] = RED);
+  HOME[BLUE].forEach(i => b[i] = BLUE);
+  return b;
+}
+
+function stepTargets(b, from) {
+  const r = Math.floor(from / N), c = from % N, out = [];
+  for (const [dr, dc] of STEP_DIRS) {
+    const nr = r + dr, nc = c + dc;
+    if (inside(nr, nc) && b[nr * N + nc] === EMPTY) out.push(nr * N + nc);
+  }
+  return out;
+}
+
+// Single jumps from `pos` for `player` (the piece itself is assumed already lifted
+// off the board or standing on `pos`). `visited` excludes squares used earlier in the chain.
+function jumpTargets(b, pos, player, visited) {
+  const r = Math.floor(pos / N), c = pos % N, out = [];
+  for (const [dr, dc] of JUMP_DIRS) {
+    const mr = r + dr, mc = c + dc, lr = r + 2 * dr, lc = c + 2 * dc;
+    if (!inside(lr, lc)) continue;
+    const mid = b[mr * N + mc], land = lr * N + lc;
+    if (mid !== EMPTY && mid !== player && b[land] === EMPTY && !(visited && visited.has(land))) out.push(land);
+  }
+  return out;
+}
+
+// All complete moves for a player: {from, to, path}. Jump chains are explored
+// fully; each distinct landing square is kept once (shortest path found first).
+function allMoves(b, player) {
+  const moves = [];
+  for (let from = 0; from < N * N; from++) {
+    if (b[from] !== player) continue;
+    for (const to of stepTargets(b, from)) moves.push({ from, to, path: [from, to] });
+    b[from] = EMPTY;
+    const seen = new Set([from]);
+    const queue = [[from]];
+    while (queue.length) {
+      const path = queue.shift();
+      const pos = path[path.length - 1];
+      for (const land of jumpTargets(b, pos, player, seen)) {
+        seen.add(land);
+        const np = path.concat(land);
+        moves.push({ from, to: land, path: np });
+        queue.push(np);
+      }
+    }
+    b[from] = player;
+  }
+  return moves;
+}
+
+// Anti-blocking rule: when on, a full target corner wins as long as at least one
+// of the squares holds your own piece, so parking a piece there to block backfires.
+let antiBlock = true;
+function hasWon(b, player) {
+  const t = TARGET[player];
+  if (!antiBlock) return t.every(i => b[i] === player);
+  return t.every(i => b[i] !== EMPTY) && t.some(i => b[i] === player);
+}
+
+// ---------- AI ----------
+function distScore(b, player) {
+  const [gr, gc] = GOAL_CORNER[player];
+  const tset = TARGET[player];
+  let sum = 0, worst = 0;
+  for (let i = 0; i < N * N; i++) {
+    if (b[i] !== player) continue;
+    const r = Math.floor(i / N), c = i % N;
+    const d = Math.max(Math.abs(r - gr), Math.abs(c - gc)) + 0.5 * (Math.abs(r - gr) + Math.abs(c - gc));
+    sum += d;
+    if (d > worst) worst = d;
+  }
+  let inTarget = 0;
+  for (const i of tset) if (b[i] === player) inTarget++;
+  // Lower is better: total distance, plus a nudge to bring stragglers along.
+  return sum + 0.6 * worst - 1.5 * inTarget;
+}
+
+function evaluate(b, me) {
+  return distScore(b, 1 - me) - distScore(b, me);
+}
+
+function applyMove(b, m) { b[m.to] = b[m.from]; b[m.from] = EMPTY; }
+function undoMove(b, m) { b[m.from] = b[m.to]; b[m.to] = EMPTY; }
+
+function search(b, depth, alpha, beta, toMove, me) {
+  if (hasWon(b, 1 - toMove)) return (1 - toMove === me ? 1 : -1) * (10000 + depth);
+  if (depth === 0) return evaluate(b, me);
+  const moves = allMoves(b, toMove);
+  if (!moves.length) return search(b, depth - 1, alpha, beta, 1 - toMove, me);
+  orderMoves(b, moves, toMove);
+  const maximizing = toMove === me;
+  let best = maximizing ? -Infinity : Infinity;
+  for (const m of moves) {
+    applyMove(b, m);
+    const v = search(b, depth - 1, alpha, beta, 1 - toMove, me);
+    undoMove(b, m);
+    if (maximizing) { if (v > best) best = v; if (best > alpha) alpha = best; }
+    else { if (v < best) best = v; if (best < beta) beta = best; }
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+
+function orderMoves(b, moves, player) {
+  const [gr, gc] = GOAL_CORNER[player];
+  const d = i => { const r = Math.floor(i / N), c = i % N; return Math.max(Math.abs(r - gr), Math.abs(c - gc)) + Math.abs(r - gr) + Math.abs(c - gc); };
+  for (const m of moves) m.gain = d(m.from) - d(m.to);
+  moves.sort((a, z) => z.gain - a.gain);
+}
+
+// `seen` maps board keys to how often each position already occurred; repeating
+// positions is penalised so the computer doesn't shuffle back and forth forever.
+function chooseAIMove(b, player, level, seen) {
+  const work = b.slice();
+  const moves = allMoves(work, player);
+  if (!moves.length) return null;
+  for (const m of moves) {
+    applyMove(work, m);
+    if (hasWon(work, player)) { undoMove(work, m); return m; }
+    undoMove(work, m);
+  }
+  const depth = level === 1 ? 1 : level === 2 ? 2 : 3;
+  orderMoves(work, moves, player);
+  const scored = [];
+  let alpha = -Infinity;
+  for (const m of moves) {
+    applyMove(work, m);
+    // Pruned moves return an upper bound; keep it strictly below the tie band so
+    // they never sneak into the pool of best moves.
+    let v = search(work, depth - 1, alpha - 0.05, Infinity, 1 - player, player);
+    if (seen) v -= 2 * (seen.get(work.join("")) || 0);
+    undoMove(work, m);
+    scored.push({ m, v });
+    if (v > alpha) alpha = v;
+  }
+  scored.sort((a, z) => z.v - a.v);
+  // Easy level picks loosely among the good moves; others break ties randomly.
+  const slack = level === 1 ? 2.5 : 0.01;
+  const pool = scored.filter(s => s.v >= scored[0].v - slack);
+  return pool[Math.floor(Math.random() * pool.length)].m;
+}
+
+// ---------- UI ----------
+const boardEl = document.getElementById("board");
+const statusText = document.getElementById("statusText");
+const turnChip = document.getElementById("turnChip");
+const moveCount = document.getElementById("moveCount");
+const endTurnBtn = document.getElementById("endTurn");
+const undoBtn = document.getElementById("undoBtn");
+const setupEl = document.getElementById("setup");
+const winBox = document.getElementById("winBox");
+
+const state = {
+  board: initialBoard(),
+  turn: RED,
+  mode: "ai",       // "ai" | "pvp"
+  human: RED,       // in ai mode
+  level: 2,
+  selected: null,   // square index of selected piece
+  chain: null,      // {from, path, visited} while a jump chain is in progress
+  history: [],      // snapshots before each turn: {board, turn}
+  lastMove: null,
+  winner: null,
+  busy: false,      // AI thinking or animating
+  moves: 0,
+};
+
+const zoneOf = new Array(N * N).fill(null);
+TARGET[RED].forEach(i => zoneOf[i] = "zone-red");
+TARGET[BLUE].forEach(i => zoneOf[i] = "zone-blue");
+
+const cells = [];
+for (let i = 0; i < N * N; i++) {
+  const r = Math.floor(i / N), c = i % N;
+  const sq = document.createElement("div");
+  sq.className = "sq " + ((r + c) % 2 ? "dark" : "light") + (zoneOf[i] ? " " + zoneOf[i] : "");
+  sq.addEventListener("click", () => onSquare(i));
+  boardEl.appendChild(sq);
+  cells.push(sq);
+}
+
+const isHumanTurn = () => state.mode === "pvp" || state.turn === state.human;
+
+function legalFromSelected() {
+  const b = state.board, s = state.selected;
+  if (s == null) return { steps: [], jumps: [] };
+  if (state.chain) {
+    return { steps: [], jumps: jumpTargets(b, s, state.turn, state.chain.visited) };
+  }
+  return { steps: stepTargets(b, s), jumps: jumpTargets(b, s, state.turn, new Set([s])) };
+}
+
+function render() {
+  const b = state.board;
+  const { steps, jumps } = legalFromSelected();
+  const lm = state.lastMove ? new Set(state.lastMove.path) : new Set();
+  const humanTurn = isHumanTurn() && state.winner == null && !state.busy;
+  for (let i = 0; i < N * N; i++) {
+    const sq = cells[i];
+    sq.classList.toggle("last", lm.has(i) && (i === state.lastMove.from || i === state.lastMove.to));
+    sq.innerHTML = "";
+    if (b[i] !== EMPTY) {
+      const p = document.createElement("div");
+      p.className = "piece " + (b[i] === RED ? "red" : "blue");
+      if (i === state.selected) p.classList.add("selected");
+      if (humanTurn && b[i] === state.turn && !state.chain) p.classList.add("movable");
+      sq.appendChild(p);
+    }
+    if (steps.includes(i)) addHint(sq, "step");
+    if (jumps.includes(i)) addHint(sq, "jump");
+  }
+  turnChip.style.background = COLORS[state.turn];
+  moveCount.textContent = state.moves ? `מהלך ${state.moves}` : "";
+  if (state.winner != null) {
+    statusText.textContent = `${NAMES[state.winner]} ניצח!`;
+    turnChip.style.background = COLORS[state.winner];
+  } else if (state.busy && !isHumanTurn()) {
+    statusText.textContent = "המחשב חושב…";
+  } else if (state.chain) {
+    statusText.textContent = "אפשר להמשיך לקפוץ, או לסיים את התור";
+  } else if (state.mode === "ai") {
+    statusText.textContent = "התור שלך";
+  } else {
+    statusText.textContent = `תור ה${NAMES[state.turn]}`;
+  }
+  endTurnBtn.classList.toggle("show", !!state.chain);
+  undoBtn.disabled = state.busy || (state.history.length === 0 && !state.chain);
+}
+
+function addHint(sq, kind) {
+  const h = document.createElement("div");
+  h.className = "hint " + kind;
+  sq.appendChild(h);
+}
+
+function onSquare(i) {
+  if (state.busy || state.winner != null || !isHumanTurn()) return;
+  const b = state.board;
+
+  if (state.chain) {
+    if (i === state.selected) return finishTurn();
+    if (legalFromSelected().jumps.includes(i)) return doJumpInChain(i);
+    return;
+  }
+
+  if (b[i] === state.turn) {
+    state.selected = state.selected === i ? null : i;
+    return render();
+  }
+  if (state.selected == null) return;
+  const { steps, jumps } = legalFromSelected();
+  const from = state.selected;
+  if (steps.includes(i)) {
+    pushHistory();
+    b[i] = b[from]; b[from] = EMPTY;
+    state.lastMove = { from, to: i, path: [from, i] };
+    state.selected = null;
+    return endTurn();
+  }
+  if (jumps.includes(i)) {
+    pushHistory();
+    state.chain = { from, path: [from], visited: new Set([from]) };
+    return doJumpInChain(i);
+  }
+  state.selected = null;
+  render();
+}
+
+function doJumpInChain(to) {
+  const b = state.board, from = state.selected;
+  b[to] = b[from]; b[from] = EMPTY;
+  state.chain.path.push(to);
+  state.chain.visited.add(to);
+  state.selected = to;
+  state.lastMove = { from: state.chain.from, to, path: state.chain.path.slice() };
+  if (hasWon(b, state.turn) || jumpTargets(b, to, state.turn, state.chain.visited).length === 0) {
+    return finishTurn();
+  }
+  render();
+}
+
+function finishTurn() {
+  state.chain = null;
+  state.selected = null;
+  endTurn();
+}
+
+function pushHistory() {
+  state.history.push({ board: state.board.slice(), turn: state.turn, lastMove: state.lastMove, moves: state.moves });
+}
+
+function endTurn() {
+  state.moves++;
+  if (hasWon(state.board, state.turn)) {
+    state.winner = state.turn;
+    render();
+    setTimeout(showWin, 350);
+    return;
+  }
+  state.turn = 1 - state.turn;
+  // A player with no legal move passes.
+  if (allMoves(state.board, state.turn).length === 0) {
+    state.turn = 1 - state.turn;
+  }
+  render();
+  maybeAI();
+}
+
+function maybeAI() {
+  if (state.mode !== "ai" || state.turn === state.human || state.winner != null) return;
+  state.busy = true;
+  render();
+  setTimeout(() => {
+    const t0 = performance.now();
+    const seen = new Map();
+    for (const k of state.history.map(h => h.board.join("")).concat(state.board.join(""))) seen.set(k, (seen.get(k) || 0) + 1);
+    const m = chooseAIMove(state.board, state.turn, state.level, seen);
+    const wait = Math.max(0, 450 - (performance.now() - t0));
+    setTimeout(() => {
+      if (!m) { state.busy = false; state.turn = 1 - state.turn; return render(); }
+      pushHistory();
+      animatePath(m.path, state.board[m.from], () => {
+        applyMove(state.board, m);
+        state.lastMove = m;
+        state.busy = false;
+        endTurn();
+      });
+    }, wait);
+  }, 30);
+}
+
+function animatePath(path, color, done) {
+  const b = state.board;
+  const from = path[0];
+  b[from] = EMPTY;
+  render();
+  const size = boardEl.clientWidth / N;
+  const fl = document.createElement("div");
+  fl.className = "float-piece";
+  fl.style.width = fl.style.height = size + "px";
+  fl.innerHTML = `<div class="piece ${color === RED ? "red" : "blue"}"></div>`;
+  const place = i => { fl.style.left = (i % N) * size + "px"; fl.style.top = Math.floor(i / N) * size + "px"; };
+  place(from);
+  boardEl.appendChild(fl);
+  fl.getBoundingClientRect();
+  fl.style.transition = "left .22s ease, top .22s ease";
+  let k = 1;
+  const next = () => {
+    if (k >= path.length) { fl.remove(); b[from] = color; return done(); }
+    place(path[k++]);
+    setTimeout(next, 260);
+  };
+  next();
+}
+
+function undo() {
+  if (state.busy) return;
+  if (state.chain) {
+    // Cancel the jump chain in progress: restore the board from before this turn.
+    restore(state.history.pop());
+    state.chain = null;
+    return render();
+  }
+  if (!state.history.length) return;
+  let snap = state.history.pop();
+  // Against the computer, rewind to the human's previous turn.
+  while (state.mode === "ai" && snap.turn !== state.human && state.history.length) snap = state.history.pop();
+  restore(snap);
+  winBox.classList.remove("show");
+  render();
+  maybeAI();
+}
+
+function restore(snap) {
+  state.board = snap.board;
+  state.turn = snap.turn;
+  state.lastMove = snap.lastMove;
+  state.moves = snap.moves;
+  state.selected = null;
+  state.winner = null;
+}
+
+function showWin() {
+  const w = state.winner;
+  let text;
+  if (state.mode === "ai") text = w === state.human ? "ניצחת! כל הכבוד 🎉" : "המחשב ניצח הפעם";
+  else text = `ה${NAMES[w]} ניצח!`;
+  document.getElementById("winEmoji").textContent = state.mode === "ai" && w !== state.human ? "🤖" : "🏆";
+  document.getElementById("winText").textContent = text;
+  winBox.classList.add("show");
+}
+
+function startGame(mode, human, level, anti) {
+  antiBlock = anti;
+  Object.assign(state, {
+    board: initialBoard(), turn: RED, mode, human, level,
+    selected: null, chain: null, history: [], lastMove: null, winner: null, busy: false, moves: 0,
+  });
+  try { localStorage.setItem("game9-setup", JSON.stringify({ mode, human, level, anti })); } catch (e) {}
+  render();
+  maybeAI();
+}
+
+// ----- setup dialog -----
+const form = document.getElementById("setupForm");
+function syncSetup() {
+  const ai = form.mode.value === "ai";
+  document.querySelectorAll(".ai-only").forEach(el => el.classList.toggle("hidden", !ai));
+}
+form.addEventListener("change", syncSetup);
+form.addEventListener("submit", e => {
+  e.preventDefault();
+  setupEl.classList.remove("show");
+  startGame(form.mode.value, +form.side.value, +form.level.value, form.anti.value === "1");
+});
+function openSetup() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("game9-setup") || "null");
+    if (saved) {
+      form.mode.value = saved.mode; form.side.value = String(saved.human); form.level.value = String(saved.level);
+      form.anti.value = saved.anti === false ? "0" : "1";
+    }
+  } catch (e) {}
+  syncSetup();
+  winBox.classList.remove("show");
+  setupEl.classList.add("show");
+}
+
+document.getElementById("newBtn").addEventListener("click", openSetup);
+document.getElementById("againBtn").addEventListener("click", openSetup);
+document.getElementById("viewBtn").addEventListener("click", () => winBox.classList.remove("show"));
+endTurnBtn.addEventListener("click", () => { if (state.chain) finishTurn(); });
+undoBtn.addEventListener("click", undo);
+
+render();
+openSetup();
+</script>
+</body>
+</html>
