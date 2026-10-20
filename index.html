@@ -179,11 +179,11 @@
       <ul>
         <li>לכל שחקן 9 חיילים, בריבוע 3×3 בפינה של הלוח. השחקנים מתחילים בפינות מנוגדות.</li>
         <li>בכל תור מזיזים חייל אחד: צעד אחד לכל כיוון (כולל אלכסון) למשבצת ריקה.</li>
-        <li>או: קפיצה מעל חייל יריב שצמוד אליו (למעלה, למטה, ימינה או שמאלה – לא באלכסון) למשבצת הריקה שמאחוריו.</li>
+        <li>או: קפיצה מעל חייל צמוד – שלך או של היריב (למעלה, למטה, ימינה או שמאלה – לא באלכסון) למשבצת הריקה שמאחוריו.</li>
         <li>אפשר לשרשר כמה קפיצות ברצף. אפשר לעצור באמצע הרצף עם "סיים תור" או בלחיצה על החייל.</li>
         <li>אין אכילה – החיילים שקופצים מעליהם נשארים על הלוח.</li>
         <li>המנצח: הראשון שממלא את כל 9 המשבצות של פינת ההתחלה של היריב (מסומנת בצבע שלו).</li>
-        <li>חוק נגד חסימה (אפשר לכבות בהגדרות המשחק): אם כל 9 משבצות היעד תפוסות ולפחות אחת מהן שלך – ניצחת, גם אם חלק מהמשבצות תפוסות על ידי היריב. כך אי אפשר "לחסום" את היריב לנצח על ידי השארת חייל בפינה שלו.</li>
+        <li>אסור לחסום: החל מהמהלך ה-100 (לפי מונה המהלכים למעלה), שחקן שמסיים תור כשאחד מהחיילים שלו עדיין בפינת הפתיחה שלו – מפסיד.</li>
       </ul>
     </details>
   </div>
@@ -212,13 +212,6 @@
           <input type="radio" name="level" id="l-1" value="1"><label for="l-1">קל</label>
           <input type="radio" name="level" id="l-2" value="2" checked><label for="l-2">בינוני</label>
           <input type="radio" name="level" id="l-3" value="3"><label for="l-3">קשה</label>
-        </div>
-      </div>
-      <div class="field">
-        <label class="title">חוק נגד חסימה</label>
-        <div class="seg">
-          <input type="radio" name="anti" id="a-on" value="1" checked><label for="a-on">פעיל</label>
-          <input type="radio" name="anti" id="a-off" value="0"><label for="a-off">כבוי</label>
         </div>
       </div>
       <button type="submit" class="primary">התחל</button>
@@ -275,15 +268,16 @@ function stepTargets(b, from) {
   return out;
 }
 
-// Single jumps from `pos` for `player` (the piece itself is assumed already lifted
-// off the board or standing on `pos`). `visited` excludes squares used earlier in the chain.
-function jumpTargets(b, pos, player, visited) {
+// Single jumps from `pos` over any adjacent piece, own or opponent's (the jumping piece
+// is assumed already lifted off the board or standing on `pos`). `visited` excludes
+// squares used earlier in the chain.
+function jumpTargets(b, pos, visited) {
   const r = Math.floor(pos / N), c = pos % N, out = [];
   for (const [dr, dc] of JUMP_DIRS) {
     const mr = r + dr, mc = c + dc, lr = r + 2 * dr, lc = c + 2 * dc;
     if (!inside(lr, lc)) continue;
     const mid = b[mr * N + mc], land = lr * N + lc;
-    if (mid !== EMPTY && mid !== player && b[land] === EMPTY && !(visited && visited.has(land))) out.push(land);
+    if (mid !== EMPTY && b[land] === EMPTY && !(visited && visited.has(land))) out.push(land);
   }
   return out;
 }
@@ -301,7 +295,7 @@ function allMoves(b, player) {
     while (queue.length) {
       const path = queue.shift();
       const pos = path[path.length - 1];
-      for (const land of jumpTargets(b, pos, player, seen)) {
+      for (const land of jumpTargets(b, pos, seen)) {
         seen.add(land);
         const np = path.concat(land);
         moves.push({ from, to: land, path: np });
@@ -313,13 +307,20 @@ function allMoves(b, player) {
   return moves;
 }
 
-// Anti-blocking rule: when on, a full target corner wins as long as at least one
-// of the squares holds your own piece, so parking a piece there to block backfires.
-let antiBlock = true;
 function hasWon(b, player) {
-  const t = TARGET[player];
-  if (!antiBlock) return t.every(i => b[i] === player);
-  return t.every(i => b[i] !== EMPTY) && t.some(i => b[i] === player);
+  return TARGET[player].every(i => b[i] === player);
+}
+
+// Anti-blocking rule: from this move number on, a player who ends a turn with a
+// piece still in their own starting corner loses, so nobody can block forever.
+const HOME_DEADLINE = 100;
+const homeLeft = (b, player) => HOME[player].filter(i => b[i] === player).length;
+
+// Result after `player` played move number `moveNo`: the winner, or null.
+function outcome(b, player, moveNo) {
+  if (hasWon(b, player)) return player;
+  if (moveNo >= HOME_DEADLINE && homeLeft(b, player)) return 1 - player;
+  return null;
 }
 
 // ---------- AI ----------
@@ -340,24 +341,32 @@ function distScore(b, player) {
   return sum + 0.6 * worst - 1.5 * inTarget;
 }
 
-function evaluate(b, me) {
-  return distScore(b, 1 - me) - distScore(b, me);
+// Pieces still at home get costlier as the deadline approaches.
+function homePenalty(b, player, moveNo) {
+  const urgency = Math.max(0, moveNo - (HOME_DEADLINE - 40)) * 0.5;
+  return urgency * homeLeft(b, player);
+}
+
+function evaluate(b, me, moveNo) {
+  return distScore(b, 1 - me) + homePenalty(b, 1 - me, moveNo) - distScore(b, me) - homePenalty(b, me, moveNo);
 }
 
 function applyMove(b, m) { b[m.to] = b[m.from]; b[m.from] = EMPTY; }
 function undoMove(b, m) { b[m.from] = b[m.to]; b[m.to] = EMPTY; }
 
-function search(b, depth, alpha, beta, toMove, me) {
-  if (hasWon(b, 1 - toMove)) return (1 - toMove === me ? 1 : -1) * (10000 + depth);
-  if (depth === 0) return evaluate(b, me);
+// `moveNo` is the number of the move just played (by 1 - toMove).
+function search(b, depth, alpha, beta, toMove, me, moveNo) {
+  const w = outcome(b, 1 - toMove, moveNo);
+  if (w != null) return (w === me ? 1 : -1) * (10000 + depth);
+  if (depth === 0) return evaluate(b, me, moveNo);
   const moves = allMoves(b, toMove);
-  if (!moves.length) return search(b, depth - 1, alpha, beta, 1 - toMove, me);
+  if (!moves.length) return search(b, depth - 1, alpha, beta, 1 - toMove, me, moveNo);
   orderMoves(b, moves, toMove);
   const maximizing = toMove === me;
   let best = maximizing ? -Infinity : Infinity;
   for (const m of moves) {
     applyMove(b, m);
-    const v = search(b, depth - 1, alpha, beta, 1 - toMove, me);
+    const v = search(b, depth - 1, alpha, beta, 1 - toMove, me, moveNo + 1);
     undoMove(b, m);
     if (maximizing) { if (v > best) best = v; if (best > alpha) alpha = best; }
     else { if (v < best) best = v; if (best < beta) beta = best; }
@@ -375,13 +384,14 @@ function orderMoves(b, moves, player) {
 
 // `seen` maps board keys to how often each position already occurred; repeating
 // positions is penalised so the computer doesn't shuffle back and forth forever.
-function chooseAIMove(b, player, level, seen) {
+// `moveNo` is the number this move will get.
+function chooseAIMove(b, player, level, seen, moveNo) {
   const work = b.slice();
   const moves = allMoves(work, player);
   if (!moves.length) return null;
   for (const m of moves) {
     applyMove(work, m);
-    if (hasWon(work, player)) { undoMove(work, m); return m; }
+    if (outcome(work, player, moveNo) === player) { undoMove(work, m); return m; }
     undoMove(work, m);
   }
   const depth = level === 1 ? 1 : level === 2 ? 2 : 3;
@@ -392,7 +402,7 @@ function chooseAIMove(b, player, level, seen) {
     applyMove(work, m);
     // Pruned moves return an upper bound; keep it strictly below the tie band so
     // they never sneak into the pool of best moves.
-    let v = search(work, depth - 1, alpha - 0.05, Infinity, 1 - player, player);
+    let v = search(work, depth - 1, alpha - 0.05, Infinity, 1 - player, player, moveNo);
     if (seen) v -= 2 * (seen.get(work.join("")) || 0);
     undoMove(work, m);
     scored.push({ m, v });
@@ -450,9 +460,9 @@ function legalFromSelected() {
   const b = state.board, s = state.selected;
   if (s == null) return { steps: [], jumps: [] };
   if (state.chain) {
-    return { steps: [], jumps: jumpTargets(b, s, state.turn, state.chain.visited) };
+    return { steps: [], jumps: jumpTargets(b, s, state.chain.visited) };
   }
-  return { steps: stepTargets(b, s), jumps: jumpTargets(b, s, state.turn, new Set([s])) };
+  return { steps: stepTargets(b, s), jumps: jumpTargets(b, s, new Set([s])) };
 }
 
 function render() {
@@ -487,6 +497,9 @@ function render() {
     statusText.textContent = "התור שלך";
   } else {
     statusText.textContent = `תור ה${NAMES[state.turn]}`;
+  }
+  if (state.winner == null && isHumanTurn() && state.moves >= HOME_DEADLINE - 20 && homeLeft(b, state.turn)) {
+    statusText.textContent += ` · להוציא את כל החיילים מהפינה עד מהלך ${HOME_DEADLINE}!`;
   }
   endTurnBtn.classList.toggle("show", !!state.chain);
   undoBtn.disabled = state.busy || (state.history.length === 0 && !state.chain);
@@ -538,7 +551,7 @@ function doJumpInChain(to) {
   state.chain.visited.add(to);
   state.selected = to;
   state.lastMove = { from: state.chain.from, to, path: state.chain.path.slice() };
-  if (hasWon(b, state.turn) || jumpTargets(b, to, state.turn, state.chain.visited).length === 0) {
+  if (hasWon(b, state.turn) || jumpTargets(b, to, state.chain.visited).length === 0) {
     return finishTurn();
   }
   render();
@@ -556,8 +569,10 @@ function pushHistory() {
 
 function endTurn() {
   state.moves++;
-  if (hasWon(state.board, state.turn)) {
-    state.winner = state.turn;
+  const w = outcome(state.board, state.turn, state.moves);
+  if (w != null) {
+    state.winner = w;
+    state.blocked = w !== state.turn;
     render();
     setTimeout(showWin, 350);
     return;
@@ -579,7 +594,7 @@ function maybeAI() {
     const t0 = performance.now();
     const seen = new Map();
     for (const k of state.history.map(h => h.board.join("")).concat(state.board.join(""))) seen.set(k, (seen.get(k) || 0) + 1);
-    const m = chooseAIMove(state.board, state.turn, state.level, seen);
+    const m = chooseAIMove(state.board, state.turn, state.level, seen, state.moves + 1);
     const wait = Math.max(0, 450 - (performance.now() - t0));
     setTimeout(() => {
       if (!m) { state.busy = false; state.turn = 1 - state.turn; return render(); }
@@ -643,6 +658,7 @@ function restore(snap) {
   state.moves = snap.moves;
   state.selected = null;
   state.winner = null;
+  state.blocked = false;
 }
 
 function showWin() {
@@ -651,17 +667,17 @@ function showWin() {
   if (state.mode === "ai") text = w === state.human ? "ניצחת! כל הכבוד 🎉" : "המחשב ניצח הפעם";
   else text = `ה${NAMES[w]} ניצח!`;
   document.getElementById("winEmoji").textContent = state.mode === "ai" && w !== state.human ? "🤖" : "🏆";
+  if (state.blocked) text += ` (ל${NAMES[1 - w]} נשארו חיילים בפינת הפתיחה אחרי מהלך ${HOME_DEADLINE})`;
   document.getElementById("winText").textContent = text;
   winBox.classList.add("show");
 }
 
-function startGame(mode, human, level, anti) {
-  antiBlock = anti;
+function startGame(mode, human, level) {
   Object.assign(state, {
     board: initialBoard(), turn: RED, mode, human, level,
-    selected: null, chain: null, history: [], lastMove: null, winner: null, busy: false, moves: 0,
+    selected: null, chain: null, history: [], lastMove: null, winner: null, blocked: false, busy: false, moves: 0,
   });
-  try { localStorage.setItem("game9-setup", JSON.stringify({ mode, human, level, anti })); } catch (e) {}
+  try { localStorage.setItem("game9-setup", JSON.stringify({ mode, human, level })); } catch (e) {}
   render();
   maybeAI();
 }
@@ -676,14 +692,13 @@ form.addEventListener("change", syncSetup);
 form.addEventListener("submit", e => {
   e.preventDefault();
   setupEl.classList.remove("show");
-  startGame(form.mode.value, +form.side.value, +form.level.value, form.anti.value === "1");
+  startGame(form.mode.value, +form.side.value, +form.level.value);
 });
 function openSetup() {
   try {
     const saved = JSON.parse(localStorage.getItem("game9-setup") || "null");
     if (saved) {
       form.mode.value = saved.mode; form.side.value = String(saved.human); form.level.value = String(saved.level);
-      form.anti.value = saved.anti === false ? "0" : "1";
     }
   } catch (e) {}
   syncSetup();
