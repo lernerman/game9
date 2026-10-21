@@ -198,8 +198,13 @@
   }
   .dialog h2 { margin: 0; text-align: center; font-weight: 500; font-size: 1.35rem; letter-spacing: .01em; }
   .field { display: flex; flex-direction: column; gap: 8px; }
-  .field label.title { color: var(--muted); font-size: .7rem; font-weight: 500; letter-spacing: .1em; }
-  .field label.title .opt { font-weight: 400; letter-spacing: .02em; text-transform: none; opacity: .7; margin-inline-start: 4px; }
+  .field label.title { color: var(--accent); font-size: .7rem; font-weight: 600; letter-spacing: .1em; }
+  .field label.title .opt { color: var(--muted); font-weight: 400; letter-spacing: .02em; margin-inline-start: 4px; }
+  /* Everything below the mode choice appears once a mode is picked. */
+  .after-mode { display: flex; flex-direction: column; gap: 16px; }
+  #setupForm:not(.has-mode) .after-mode { display: none; }
+  #setupForm.has-mode .after-mode { animation: reveal .25s ease; }
+  @keyframes reveal { from { opacity: 0; transform: translateY(-4px); } }
 
   /* Option tiles (mode, side): a card per choice with an icon on top. */
   .seg { display: flex; gap: 8px; }
@@ -222,9 +227,15 @@
   .seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
   .seg label svg { width: 30px; height: 30px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .seg input:checked + label svg { stroke: var(--accent); }
-  .seg label small { display: block; font-size: .72rem; color: var(--muted); font-weight: 400; margin-top: -4px; }
-  .seg .mini { width: 30px; height: 30px; flex: none; }
-  .seg .mini::after { inset: 26%; }
+  /* Side tiles: one compact row – piece, color name, and a quiet turn-order numeral. */
+  .seg.sides label { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 11px 14px; }
+  .seg .mini { width: 22px; height: 22px; flex: none; }
+  .seg .mini::after { display: none; }
+  .seg .order {
+    margin-inline-start: auto; font-family: "Fraunces", Georgia, serif; font-style: italic;
+    font-size: .95rem; color: var(--muted); opacity: .75;
+  }
+  .seg .order sup { font-size: .6em; margin-inline-start: 1px; }
 
   /* Difficulty: one sliding track with signal-strength pips. */
   .track {
@@ -319,7 +330,7 @@
       <div class="field">
         <label class="title">MODE</label>
         <div class="seg">
-          <input type="radio" name="mode" id="m-ai" value="ai" checked>
+          <input type="radio" name="mode" id="m-ai" value="ai">
           <label for="m-ai">
             <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="6" width="24" height="16" rx="2.5"/><path d="M12 27h8M16 22v5"/><circle cx="12" cy="14" r="2"/><circle cx="20" cy="14" r="2"/></svg>
             vs Computer
@@ -331,34 +342,36 @@
           </label>
         </div>
       </div>
-      <div class="field">
-        <label class="title">NAMES <span class="opt">optional</span></label>
-        <div class="names ai-only">
-          <label class="name-input"><input id="nameMe" maxlength="14" autocomplete="off" placeholder="Your name"></label>
+      <div class="after-mode">
+        <div class="field ai-only" id="sideField">
+          <label class="title">PLAY AS</label>
+          <div class="seg sides">
+            <input type="radio" name="side" id="s-red" value="0" checked>
+            <label for="s-red"><span class="piece red mini"></span><span id="sideLabel0"></span><span class="order" title="Moves first">1<sup>st</sup></span></label>
+            <input type="radio" name="side" id="s-blue" value="1">
+            <label for="s-blue"><span class="piece blue mini"></span><span id="sideLabel1"></span><span class="order" title="Moves second">2<sup>nd</sup></span></label>
+          </div>
         </div>
-        <div class="names pvp-only">
-          <label class="name-input"><span class="piece red"></span><input id="name0" maxlength="14" autocomplete="off"></label>
-          <label class="name-input"><span class="piece blue"></span><input id="name1" maxlength="14" autocomplete="off"></label>
+        <div class="field ai-only" id="levelField">
+          <label class="title">DIFFICULTY</label>
+          <div class="track">
+            <input type="radio" name="level" id="l-1" value="1"><label for="l-1"><span class="pips" data-n="1"><i></i><i></i><i></i></span>Easy</label>
+            <input type="radio" name="level" id="l-2" value="2" checked><label for="l-2"><span class="pips" data-n="2"><i></i><i></i><i></i></span>Medium</label>
+            <input type="radio" name="level" id="l-3" value="3"><label for="l-3"><span class="pips" data-n="3"><i></i><i></i><i></i></span>Hard</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="title"><span class="ai-only">YOUR NAME</span><span class="pvp-only">NAMES</span> <span class="opt">optional</span></label>
+          <div class="names ai-only">
+            <label class="name-input"><input id="nameMe" maxlength="14" autocomplete="off" placeholder="Your name"></label>
+          </div>
+          <div class="names pvp-only">
+            <label class="name-input"><span class="piece red"></span><input id="name0" maxlength="14" autocomplete="off"></label>
+            <label class="name-input"><span class="piece blue"></span><input id="name1" maxlength="14" autocomplete="off"></label>
+          </div>
         </div>
       </div>
-      <div class="field ai-only" id="sideField">
-        <label class="title">PLAY AS</label>
-        <div class="seg">
-          <input type="radio" name="side" id="s-red" value="0" checked>
-          <label for="s-red"><span class="piece red mini"></span><span><span id="sideLabel0"></span><small>moves first</small></span></label>
-          <input type="radio" name="side" id="s-blue" value="1">
-          <label for="s-blue"><span class="piece blue mini"></span><span><span id="sideLabel1"></span><small>moves second</small></span></label>
-        </div>
-      </div>
-      <div class="field ai-only" id="levelField">
-        <label class="title">DIFFICULTY</label>
-        <div class="track">
-          <input type="radio" name="level" id="l-1" value="1"><label for="l-1"><span class="pips" data-n="1"><i></i><i></i><i></i></span>Easy</label>
-          <input type="radio" name="level" id="l-2" value="2" checked><label for="l-2"><span class="pips" data-n="2"><i></i><i></i><i></i></span>Medium</label>
-          <input type="radio" name="level" id="l-3" value="3"><label for="l-3"><span class="pips" data-n="3"><i></i><i></i><i></i></span>Hard</label>
-        </div>
-      </div>
-      <button type="submit" class="primary">Start</button>
+      <button type="submit" class="primary" id="startBtn" disabled>Start</button>
     </form>
   </div>
 
@@ -850,6 +863,8 @@ const form = document.getElementById("setupForm");
 const nameInputs = { me: form.nameMe, 0: form.name0, 1: form.name1 };
 function syncSetup() {
   const ai = form.mode.value === "ai";
+  form.classList.toggle("has-mode", !!form.mode.value);
+  document.getElementById("startBtn").disabled = !form.mode.value;
   document.querySelectorAll(".ai-only").forEach(el => el.classList.toggle("hidden", !ai));
   document.querySelectorAll(".pvp-only").forEach(el => el.classList.toggle("hidden", ai));
 }
@@ -865,10 +880,12 @@ function openSetup() {
   try {
     const saved = JSON.parse(localStorage.getItem("game9-setup") || "null");
     if (saved) {
-      form.mode.value = saved.mode; form.side.value = String(saved.human); form.level.value = String(saved.level);
+      form.side.value = String(saved.human); form.level.value = String(saved.level);
       for (const k in nameInputs) nameInputs[k].value = (saved.names && saved.names[k]) || "";
     }
   } catch (e) {}
+  // Start with no mode picked; the rest of the form opens once one is chosen.
+  for (const r of form.mode) r.checked = false;
   syncSetup();
   winBox.classList.remove("show");
   setupEl.classList.add("show");
