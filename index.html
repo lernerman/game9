@@ -68,20 +68,28 @@
     font-family: "Heebo", system-ui, sans-serif;
     font-weight: 400;
     display: flex; flex-direction: column; align-items: center;
-    padding-block: 20px 32px;
+    /* The whole game fits one screen: the board shrinks to whatever height is left. */
+    height: 100vh; height: 100dvh; overflow: hidden;
+    padding-top: max(14px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
-    min-height: 100%;
     transition: background-color .3s ease, color .3s ease;
   }
-  .wrap { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 14px; }
+  .wrap { width: 100%; max-width: 560px; height: 100%; display: flex; flex-direction: column; gap: 12px; }
+  .board-area {
+    flex: 1 1 auto; min-height: 0; container-type: size;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .board-area .board-frame { width: min(100cqw, 100cqh); }
 
   .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
   .brand h1 {
     margin: 0; font-family: "Frank Ruhl Libre", Georgia, serif; font-weight: 500;
-    font-size: 2rem; line-height: 1; letter-spacing: .01em;
+    font-size: 1.7rem; line-height: 1; letter-spacing: .01em;
   }
-  .brand p { margin: 6px 0 0; color: var(--muted); font-size: .85rem; font-weight: 300; letter-spacing: .02em; }
+  .brand p { margin: 4px 0 0; color: var(--muted); font-size: .8rem; font-weight: 300; letter-spacing: .02em; }
+  @media (max-height: 640px) { .brand p { display: none; } }
 
   .skins { display: flex; gap: 8px; }
   .skin {
@@ -99,7 +107,7 @@
 
   .status {
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-    padding: 10px 14px; display: flex; align-items: center; gap: 12px; min-height: 50px;
+    padding: 8px 14px; display: flex; align-items: center; gap: 12px; min-height: 44px; flex: none;
   }
   .chip {
     width: 18px; height: 18px; border-radius: 50%; flex: none;
@@ -160,7 +168,8 @@
   .float-piece { position: absolute; z-index: 5; pointer-events: none; display: flex; align-items: center; justify-content: center; }
   .float-piece .piece { width: 76%; height: 76%; }
 
-  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .controls { display: flex; gap: 8px; flex: none; }
+  .controls button { padding-inline: 8px; white-space: nowrap; }
   button {
     font: inherit; font-weight: 500; border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; cursor: pointer;
     background: var(--panel); color: var(--ink);
@@ -173,9 +182,8 @@
   #endTurn { display: none; }
   #endTurn.show { display: block; }
 
-  .rules { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2px 16px; }
-  .rules summary { cursor: pointer; padding: 12px 0; font-weight: 500; }
-  .rules ul { margin: 0 0 14px; padding-inline-start: 18px; line-height: 1.7; font-weight: 300; font-size: .95rem; }
+  .rules { max-width: 460px; max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .rules ul { margin: 0; padding-inline-start: 18px; line-height: 1.7; font-weight: 300; font-size: .95rem; }
 
   /* dialogs */
   .overlay {
@@ -220,16 +228,20 @@
       <div class="moves" id="moveCount"></div>
     </div>
 
-    <div class="board-frame"><div class="board" id="board"></div></div>
+    <div class="board-area"><div class="board-frame"><div class="board" id="board"></div></div></div>
 
     <div class="controls">
       <button id="endTurn" class="primary">סיים תור</button>
       <button id="undoBtn">בטל מהלך</button>
       <button id="newBtn">משחק חדש</button>
+      <button id="rulesBtn">חוקים</button>
     </div>
+  </div>
 
-    <details class="rules">
-      <summary>חוקי המשחק</summary>
+  <!-- rules dialog -->
+  <div class="overlay" id="rulesBox">
+    <div class="dialog rules">
+      <h2>חוקי המשחק</h2>
       <ul>
         <li>לכל שחקן 9 חיילים, בריבוע 3×3 בפינה של הלוח. השחקנים מתחילים בפינות מנוגדות.</li>
         <li>בכל תור מזיזים חייל אחד: צעד אחד לכל כיוון (כולל אלכסון) למשבצת ריקה.</li>
@@ -239,7 +251,8 @@
         <li>המנצח: הראשון שממלא את כל 9 המשבצות של פינת ההתחלה של היריב (מסומנת בצבע שלו).</li>
         <li>אסור לחסום: החל מהמהלך ה-100 (לפי מונה המהלכים למעלה), שחקן שמסיים תור כשאחד מהחיילים שלו עדיין בפינת הפתיחה שלו – מפסיד.</li>
       </ul>
-    </details>
+      <button class="primary" id="rulesClose">הבנתי</button>
+    </div>
   </div>
 
   <!-- new game dialog -->
@@ -777,6 +790,10 @@ document.getElementById("againBtn").addEventListener("click", openSetup);
 document.getElementById("viewBtn").addEventListener("click", () => winBox.classList.remove("show"));
 endTurnBtn.addEventListener("click", () => { if (state.chain) finishTurn(); });
 undoBtn.addEventListener("click", undo);
+const rulesBox = document.getElementById("rulesBox");
+document.getElementById("rulesBtn").addEventListener("click", () => rulesBox.classList.add("show"));
+document.getElementById("rulesClose").addEventListener("click", () => rulesBox.classList.remove("show"));
+rulesBox.addEventListener("click", e => { if (e.target === rulesBox) rulesBox.classList.remove("show"); });
 
 // ----- skins -----
 const skinsEl = document.getElementById("skins");
