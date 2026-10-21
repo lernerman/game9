@@ -83,13 +83,11 @@
   }
   .board-area .board-frame { width: min(100cqw, 100cqh); }
 
-  .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .brand h1 {
     margin: 0; font-family: "Frank Ruhl Libre", Georgia, serif; font-weight: 500;
     font-size: 1.7rem; line-height: 1; letter-spacing: .01em;
   }
-  .brand p { margin: 4px 0 0; color: var(--muted); font-size: .8rem; font-weight: 300; letter-spacing: .02em; }
-  @media (max-height: 640px) { .brand p { display: none; } }
 
   .skins { display: flex; gap: 8px; }
   .skin {
@@ -217,7 +215,6 @@
     <header class="top">
       <div class="brand">
         <h1>משחק 9</h1>
-        <p>וריאציה של דמקה סינית</p>
       </div>
       <div class="skins" id="skins" role="group" aria-label="עיצוב"></div>
     </header>
