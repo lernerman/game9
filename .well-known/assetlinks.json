@@ -1,10 +1,15 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "com.haleli9.twa",
-    "sha256_cert_fingerprints": [
-      "59:4F:99:BE:6B:CA:88:52:65:16:26:A6:E5:E3:32:C2:54:55:18:56:86:D0:56:85:6C:F4:41:C2:9B:0C:40:09"
-    ]
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.haleli9.twa",
+      "sha256_cert_fingerprints": [
+        "5D:04:78:90:2C:15:25:5A:7F:3D:97:8A:00:AD:B7:AB:2B:EB:30:D6:D9:15:6D:5F:A1:B9:3A:23:5B:EB:3F:D7",
+        "59:4F:99:BE:6B:CA:88:52:65:16:26:A6:E5:E3:32:C2:54:55:18:56:86:D0:56:85:6C:F4:41:C2:9B:0C:40:09"
+      ]
+    }
   }
-}]
+]
