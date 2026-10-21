@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.haleli9.twa",
+    "sha256_cert_fingerprints": [
+      "59:4F:99:BE:6B:CA:88:52:65:16:26:A6:E5:E3:32:C2:54:55:18:56:86:D0:56:85:6C:F4:41:C2:9B:0C:40:09"
+    ]
+  }
+}]
