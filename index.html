@@ -337,6 +337,13 @@
           <input type="radio" name="hints" id="h-off" value="0"><label for="h-off">Hide</label>
         </div>
       </div>
+      <div class="field">
+        <label class="title">JUMP CHAINS</label>
+        <div class="track">
+          <input type="radio" name="chains" id="c-fwd" value="1" checked><label for="c-fwd">Forward only</label>
+          <input type="radio" name="chains" id="c-any" value="0"><label for="c-any">Any direction</label>
+        </div>
+      </div>
       <button type="button" id="rulesBtn">How to play</button>
       <button type="button" class="primary" id="settingsClose">Done</button>
     </form>
@@ -350,10 +357,10 @@
         <li>Each player has 9 pieces in a 3×3 block in a corner. Players start in opposite corners.</li>
         <li>On your turn, move one piece: a single step up, down, left or right (not diagonally) to an empty square.</li>
         <li>Or jump over an adjacent piece – yours or your opponent's – up, down, left or right (not diagonally) onto the empty square behind it.</li>
-        <li>Jumps can be chained. Stop a chain whenever you like with "End turn" or by tapping the piece.</li>
+        <li>Jumps can be chained. Stop a chain whenever you like with "End turn" or by tapping the piece. By default a chain ends by itself once no jump moves you forward (change this under Jump chains in Settings).</li>
         <li>Nothing is captured – pieces you jump over stay on the board.</li>
         <li>To win, be the first to fill all 9 squares of your opponent's starting corner (shaded in their color).</li>
-        <li>No blocking: from move 100 on (see the move counter), a player who ends a turn with a piece still in their own starting corner loses.</li>
+        <li>No blocking: if the corner you are heading for is full and at least one of the pieces in it is yours, you win – so leaving a piece at home to block only hands your opponent the game.</li>
       </ul>
       <button class="primary" id="rulesClose">Got it</button>
     </div>
@@ -509,19 +516,19 @@ function allMoves(b, player) {
   return moves;
 }
 
+// Anti-blocking rule: a full target corner wins as long as at least one of its
+// squares holds your own piece, so leaving a piece at home to block only helps
+// the opponent.
 function hasWon(b, player) {
-  return TARGET[player].every(i => b[i] === player);
+  const t = TARGET[player];
+  return t.every(i => b[i] !== EMPTY) && t.some(i => b[i] === player);
 }
 
-// Anti-blocking rule: from this move number on, a player who ends a turn with a
-// piece still in their own starting corner loses, so nobody can block forever.
-const HOME_DEADLINE = 100;
-const homeLeft = (b, player) => HOME[player].filter(i => b[i] === player).length;
-
-// Result after `player` played move number `moveNo`: the winner, or null.
-function outcome(b, player, moveNo) {
+// Result after `player` moved: the winner, or null. Moving back into your own
+// corner can complete the opponent's target, so both sides are checked.
+function outcome(b, player) {
   if (hasWon(b, player)) return player;
-  if (moveNo >= HOME_DEADLINE && homeLeft(b, player)) return 1 - player;
+  if (hasWon(b, 1 - player)) return 1 - player;
   return null;
 }
 
@@ -544,32 +551,25 @@ function distScore(b, player) {
   return sum + 0.6 * worst - 1.5 * inTarget;
 }
 
-// Pieces still at home get costlier as the deadline approaches.
-function homePenalty(b, player, moveNo) {
-  const urgency = Math.max(0, moveNo - (HOME_DEADLINE - 40)) * 0.5;
-  return urgency * homeLeft(b, player);
-}
-
-function evaluate(b, me, moveNo) {
-  return distScore(b, 1 - me) + homePenalty(b, 1 - me, moveNo) - distScore(b, me) - homePenalty(b, me, moveNo);
+function evaluate(b, me) {
+  return distScore(b, 1 - me) - distScore(b, me);
 }
 
 function applyMove(b, m) { b[m.to] = b[m.from]; b[m.from] = EMPTY; }
 function undoMove(b, m) { b[m.from] = b[m.to]; b[m.to] = EMPTY; }
 
-// `moveNo` is the number of the move just played (by 1 - toMove).
-function search(b, depth, alpha, beta, toMove, me, moveNo) {
-  const w = outcome(b, 1 - toMove, moveNo);
+function search(b, depth, alpha, beta, toMove, me) {
+  const w = outcome(b, 1 - toMove);
   if (w != null) return (w === me ? 1 : -1) * (10000 + depth);
-  if (depth === 0) return evaluate(b, me, moveNo);
+  if (depth === 0) return evaluate(b, me);
   const moves = allMoves(b, toMove);
-  if (!moves.length) return search(b, depth - 1, alpha, beta, 1 - toMove, me, moveNo);
+  if (!moves.length) return search(b, depth - 1, alpha, beta, 1 - toMove, me);
   orderMoves(b, moves, toMove);
   const maximizing = toMove === me;
   let best = maximizing ? -Infinity : Infinity;
   for (const m of moves) {
     applyMove(b, m);
-    const v = search(b, depth - 1, alpha, beta, 1 - toMove, me, moveNo + 1);
+    const v = search(b, depth - 1, alpha, beta, 1 - toMove, me);
     undoMove(b, m);
     if (maximizing) { if (v > best) best = v; if (best > alpha) alpha = best; }
     else { if (v < best) best = v; if (best < beta) beta = best; }
@@ -587,14 +587,13 @@ function orderMoves(b, moves, player) {
 
 // `seen` maps board keys to how often each position already occurred; repeating
 // positions is penalised so the computer doesn't shuffle back and forth forever.
-// `moveNo` is the number this move will get.
-function chooseAIMove(b, player, level, seen, moveNo) {
+function chooseAIMove(b, player, level, seen) {
   const work = b.slice();
   const moves = allMoves(work, player);
   if (!moves.length) return null;
   for (const m of moves) {
     applyMove(work, m);
-    if (outcome(work, player, moveNo) === player) { undoMove(work, m); return m; }
+    if (outcome(work, player) === player) { undoMove(work, m); return m; }
     undoMove(work, m);
   }
   // Even depths end on the opponent's reply and play worse here: Easy looks one
@@ -607,7 +606,7 @@ function chooseAIMove(b, player, level, seen, moveNo) {
     applyMove(work, m);
     // Pruned moves return an upper bound; keep it strictly below the tie band so
     // they never sneak into the pool of best moves.
-    let v = search(work, depth - 1, alpha - 0.05, Infinity, 1 - player, player, moveNo);
+    let v = search(work, depth - 1, alpha - 0.05, Infinity, 1 - player, player);
     if (seen) v -= 2 * (seen.get(work.join("")) || 0);
     undoMove(work, m);
     scored.push({ m, v });
@@ -665,10 +664,18 @@ const isHumanTurn = () => state.mode === "pvp" || state.turn === state.human;
 function legalFromSelected() {
   const b = state.board, s = state.selected;
   if (s == null) return { steps: [], jumps: [] };
-  if (state.chain) {
-    return { steps: [], jumps: jumpTargets(b, s, state.chain.visited) };
-  }
+  if (state.chain) return { steps: [], jumps: chainJumps(b, s) };
   return { steps: stepTargets(b, s), jumps: jumpTargets(b, s, new Set([s])) };
+}
+
+// Jumps that may continue a chain. With "forward only" on, a chain goes on only
+// while a jump brings the piece closer to its goal; otherwise the turn ends.
+function chainJumps(b, pos) {
+  const all = jumpTargets(b, pos, state.chain.visited);
+  if (!forwardChains) return all;
+  const [gr, gc] = GOAL_CORNER[state.turn];
+  const dist = i => Math.abs(Math.floor(i / N) - gr) + Math.abs(i % N - gc);
+  return all.filter(i => dist(i) < dist(pos));
 }
 
 function render() {
@@ -703,9 +710,6 @@ function render() {
     statusText.textContent = state.names.me ? `Your turn, ${state.names.me}` : "Your turn";
   } else {
     statusText.textContent = `${label(state.turn)}’s turn`;
-  }
-  if (state.winner == null && isHumanTurn() && state.moves >= HOME_DEADLINE - 20 && homeLeft(b, state.turn)) {
-    statusText.textContent += ` · Clear your starting corner by move ${HOME_DEADLINE}!`;
   }
   endTurnBtn.classList.toggle("show", !!state.chain);
   undoBtn.disabled = state.busy || (state.history.length === 0 && !state.chain);
@@ -757,7 +761,7 @@ function doJumpInChain(to) {
   state.chain.visited.add(to);
   state.selected = to;
   state.lastMove = { from: state.chain.from, to, path: state.chain.path.slice() };
-  if (hasWon(b, state.turn) || jumpTargets(b, to, state.chain.visited).length === 0) {
+  if (outcome(b, state.turn) != null || chainJumps(b, to).length === 0) {
     return finishTurn();
   }
   render();
@@ -775,10 +779,9 @@ function pushHistory() {
 
 function endTurn() {
   state.moves++;
-  const w = outcome(state.board, state.turn, state.moves);
+  const w = outcome(state.board, state.turn);
   if (w != null) {
     state.winner = w;
-    state.blocked = w !== state.turn;
     render();
     setTimeout(showWin, 350);
     return;
@@ -800,7 +803,7 @@ function maybeAI() {
     const t0 = performance.now();
     const seen = new Map();
     for (const k of state.history.map(h => h.board.join("")).concat(state.board.join(""))) seen.set(k, (seen.get(k) || 0) + 1);
-    const m = chooseAIMove(state.board, state.turn, state.level, seen, state.moves + 1);
+    const m = chooseAIMove(state.board, state.turn, state.level, seen);
     const wait = Math.max(0, 450 - (performance.now() - t0));
     setTimeout(() => {
       if (!m) { state.busy = false; state.turn = 1 - state.turn; return render(); }
@@ -864,7 +867,6 @@ function restore(snap) {
   state.moves = snap.moves;
   state.selected = null;
   state.winner = null;
-  state.blocked = false;
 }
 
 function showWin() {
@@ -874,9 +876,7 @@ function showWin() {
   else text = `${label(w)} wins`;
   document.getElementById("winChip").style.background = COLORS[w];
   document.getElementById("winText").textContent = text;
-  document.getElementById("winSub").textContent = state.blocked
-    ? `${label(1 - w)} still had a piece in the starting corner after move ${HOME_DEADLINE}`
-    : `in ${state.moves} moves`;
+  document.getElementById("winSub").textContent = `in ${state.moves} moves`;
   winBox.classList.add("show");
 }
 
@@ -889,7 +889,7 @@ function label(p) {
 function startGame(mode, human, level, names) {
   Object.assign(state, {
     board: initialBoard(), turn: RED, mode, human, level, names,
-    selected: null, chain: null, history: [], lastMove: null, winner: null, blocked: false, busy: false, moves: 0,
+    selected: null, chain: null, history: [], lastMove: null, winner: null, busy: false, moves: 0,
   });
   try { localStorage.setItem("game9-setup", JSON.stringify({ mode, human, level, names })); } catch (e) {}
   render();
@@ -954,12 +954,22 @@ settingsBox.addEventListener("click", e => { if (e.target === settingsBox) close
 let showHints = true;
 try { showHints = localStorage.getItem("game9-hints") !== "0"; } catch (e) {}
 settingsForm.hints.value = showHints ? "1" : "0";
+let forwardChains = true;
+try { forwardChains = localStorage.getItem("game9-chains") !== "0"; } catch (e) {}
+settingsForm.chains.value = forwardChains ? "1" : "0";
 settingsForm.addEventListener("change", e => {
   if (e.target.name === "theme") applySkin(e.target.value);
   if (e.target.name === "hints") {
     showHints = e.target.value === "1";
     try { localStorage.setItem("game9-hints", e.target.value); } catch (err) {}
     render();
+  }
+  if (e.target.name === "chains") {
+    forwardChains = e.target.value === "1";
+    try { localStorage.setItem("game9-chains", e.target.value); } catch (err) {}
+    // A chain in progress may now have nothing left to continue with.
+    if (state.chain && chainJumps(state.board, state.selected).length === 0) finishTurn();
+    else render();
   }
 });
 
