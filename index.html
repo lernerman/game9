@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl" data-skin="walnut">
+<html lang="en" data-skin="walnut">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#efe9e1" />
-<title>משחק 9</title>
+<title>9</title>
 <meta name="claude:viewport-fit-sides" content="cover" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   /* Each skin defines the full palette. p0 = first player, p1 = second player. */
   :root, [data-skin="walnut"] {
@@ -65,7 +65,7 @@
   body {
     background: var(--bg);
     color: var(--ink);
-    font-family: "Heebo", system-ui, sans-serif;
+    font-family: "Inter", system-ui, sans-serif;
     font-weight: 400;
     display: flex; flex-direction: column; align-items: center;
     /* The whole game fits one screen: the board shrinks to whatever height is left. */
@@ -85,8 +85,10 @@
 
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .brand h1 {
-    margin: 0; font-family: "Frank Ruhl Libre", Georgia, serif; font-weight: 500;
-    font-size: 1.7rem; line-height: 1; letter-spacing: .01em;
+    margin: 0; font-family: "Fraunces", Georgia, serif; font-style: italic; font-weight: 600;
+    font-variation-settings: "opsz" 144;
+    font-size: 3rem; line-height: .8; padding-inline-end: 4px;
+    color: var(--ink);
   }
 
   .skins { display: flex; gap: 8px; }
@@ -194,17 +196,75 @@
     box-shadow: 0 20px 60px rgba(0,0,0,.25);
     padding: 24px; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px;
   }
-  .dialog h2 { margin: 0; text-align: center; font-family: "Frank Ruhl Libre", Georgia, serif; font-weight: 500; font-size: 1.6rem; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  .field label.title { color: var(--muted); font-size: .8rem; letter-spacing: .03em; }
-  .seg { display: flex; gap: 6px; }
-  .seg input { display: none; }
+  .dialog h2 { margin: 0; text-align: center; font-weight: 500; font-size: 1.35rem; letter-spacing: .01em; }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .field label.title { color: var(--muted); font-size: .7rem; font-weight: 500; letter-spacing: .1em; }
+  .field label.title .opt { font-weight: 400; letter-spacing: .02em; text-transform: none; opacity: .7; margin-inline-start: 4px; }
+
+  /* Option tiles (mode, side): a card per choice with an icon on top. */
+  .seg { display: flex; gap: 8px; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
   .seg label {
-    flex: 1; text-align: center; padding: 10px 6px; border-radius: 8px; cursor: pointer;
-    border: 1px solid var(--line); font-size: .95rem;
+    flex: 1; cursor: pointer; position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    padding: 14px 8px 12px; border-radius: 12px; font-size: .92rem; text-align: center;
+    background: color-mix(in srgb, var(--ink) 3%, var(--panel));
+    border: 1px solid var(--line); color: var(--muted);
+    transition: transform .15s ease, border-color .15s ease, background-color .15s ease, color .15s ease, box-shadow .15s ease;
   }
-  .seg input:checked + label { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); font-weight: 500; }
-  .ai-only.hidden { display: none; }
+  .seg label:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .seg input:checked + label {
+    color: var(--ink); font-weight: 500;
+    background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent), 0 6px 18px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .seg label svg { width: 30px; height: 30px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .seg input:checked + label svg { stroke: var(--accent); }
+  .seg label small { display: block; font-size: .72rem; color: var(--muted); font-weight: 400; margin-top: -4px; }
+  .seg .mini { width: 30px; height: 30px; flex: none; }
+  .seg .mini::after { inset: 26%; }
+
+  /* Difficulty: one sliding track with signal-strength pips. */
+  .track {
+    display: flex; padding: 4px; gap: 4px; border-radius: 12px;
+    background: color-mix(in srgb, var(--ink) 6%, var(--panel));
+  }
+  .track input { position: absolute; opacity: 0; pointer-events: none; }
+  .track label {
+    flex: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 9px 6px; border-radius: 9px; color: var(--muted); font-size: .92rem;
+    transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  .track input:checked + label {
+    background: var(--accent); color: var(--on-accent); font-weight: 500;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .track input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pips { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+  .pips i { width: 3px; border-radius: 1px; background: currentColor; opacity: .3; }
+  .pips i:nth-child(1) { height: 5px; } .pips i:nth-child(2) { height: 8px; } .pips i:nth-child(3) { height: 12px; }
+  .pips[data-n="1"] i:nth-child(-n+1), .pips[data-n="2"] i:nth-child(-n+2), .pips[data-n="3"] i { opacity: 1; }
+
+  .dialog button[type="submit"] { padding-block: 14px; font-size: 1.05rem; margin-top: 4px; }
+  .ai-only.hidden, .pvp-only.hidden { display: none; }
+
+  .names { display: flex; gap: 8px; }
+  .name-input {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+    padding: 0 12px; border-radius: 12px; border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--ink) 3%, var(--panel));
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .name-input:focus-within { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .name-input .piece { width: 18px; height: 18px; flex: none; }
+  .name-input .piece::after { display: none; }
+  .name-input input {
+    flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink);
+    font: inherit; font-size: 16px; padding: 12px 0;
+  }
+  .name-input input::placeholder { color: var(--muted); opacity: .8; }
   .win-chip { width: 44px; height: 44px; margin: 0 auto; }
   .win-sub { margin: -6px 0 0; text-align: center; color: var(--muted); font-size: .9rem; }
   .win-sub:empty { display: none; }
@@ -214,9 +274,9 @@
   <div class="wrap">
     <header class="top">
       <div class="brand">
-        <h1>משחק 9</h1>
+        <h1>9</h1>
       </div>
-      <div class="skins" id="skins" role="group" aria-label="עיצוב"></div>
+      <div class="skins" id="skins" role="group" aria-label="Theme"></div>
     </header>
 
     <div class="status">
@@ -228,57 +288,77 @@
     <div class="board-area"><div class="board-frame"><div class="board" id="board"></div></div></div>
 
     <div class="controls">
-      <button id="endTurn" class="primary">סיים תור</button>
-      <button id="undoBtn">בטל מהלך</button>
-      <button id="newBtn">משחק חדש</button>
-      <button id="rulesBtn">חוקים</button>
+      <button id="endTurn" class="primary">End turn</button>
+      <button id="undoBtn">Undo</button>
+      <button id="newBtn">New game</button>
+      <button id="rulesBtn">Rules</button>
     </div>
   </div>
 
   <!-- rules dialog -->
   <div class="overlay" id="rulesBox">
     <div class="dialog rules">
-      <h2>חוקי המשחק</h2>
+      <h2>How to play</h2>
       <ul>
-        <li>לכל שחקן 9 חיילים, בריבוע 3×3 בפינה של הלוח. השחקנים מתחילים בפינות מנוגדות.</li>
-        <li>בכל תור מזיזים חייל אחד: צעד אחד לכל כיוון (כולל אלכסון) למשבצת ריקה.</li>
-        <li>או: קפיצה מעל חייל צמוד – שלך או של היריב (למעלה, למטה, ימינה או שמאלה – לא באלכסון) למשבצת הריקה שמאחוריו.</li>
-        <li>אפשר לשרשר כמה קפיצות ברצף. אפשר לעצור באמצע הרצף עם "סיים תור" או בלחיצה על החייל.</li>
-        <li>אין אכילה – החיילים שקופצים מעליהם נשארים על הלוח.</li>
-        <li>המנצח: הראשון שממלא את כל 9 המשבצות של פינת ההתחלה של היריב (מסומנת בצבע שלו).</li>
-        <li>אסור לחסום: החל מהמהלך ה-100 (לפי מונה המהלכים למעלה), שחקן שמסיים תור כשאחד מהחיילים שלו עדיין בפינת הפתיחה שלו – מפסיד.</li>
+        <li>Each player has 9 pieces in a 3×3 block in a corner. Players start in opposite corners.</li>
+        <li>On your turn, move one piece: a single step in any direction (diagonals too) to an empty square.</li>
+        <li>Or jump over an adjacent piece – yours or your opponent's – up, down, left or right (not diagonally) onto the empty square behind it.</li>
+        <li>Jumps can be chained. Stop a chain whenever you like with "End turn" or by tapping the piece.</li>
+        <li>Nothing is captured – pieces you jump over stay on the board.</li>
+        <li>To win, be the first to fill all 9 squares of your opponent's starting corner (shaded in their color).</li>
+        <li>No blocking: from move 100 on (see the move counter), a player who ends a turn with a piece still in their own starting corner loses.</li>
       </ul>
-      <button class="primary" id="rulesClose">הבנתי</button>
+      <button class="primary" id="rulesClose">Got it</button>
     </div>
   </div>
 
   <!-- new game dialog -->
   <div class="overlay" id="setup">
     <form class="dialog" id="setupForm">
-      <h2>משחק חדש</h2>
+      <h2>New game</h2>
       <div class="field">
-        <label class="title">מצב משחק</label>
+        <label class="title">MODE</label>
         <div class="seg">
-          <input type="radio" name="mode" id="m-ai" value="ai" checked><label for="m-ai">נגד המחשב</label>
-          <input type="radio" name="mode" id="m-pvp" value="pvp"><label for="m-pvp">שני שחקנים</label>
+          <input type="radio" name="mode" id="m-ai" value="ai" checked>
+          <label for="m-ai">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="6" width="24" height="16" rx="2.5"/><path d="M12 27h8M16 22v5"/><circle cx="12" cy="14" r="2"/><circle cx="20" cy="14" r="2"/></svg>
+            vs Computer
+          </label>
+          <input type="radio" name="mode" id="m-pvp" value="pvp">
+          <label for="m-pvp">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="11" cy="11" r="4"/><path d="M4 26c0-4 3-7 7-7s7 3 7 7"/><circle cx="22" cy="12" r="3.2"/><path d="M19.5 19.6c.8-.4 1.6-.6 2.5-.6 3.3 0 6 2.6 6 6"/></svg>
+            Two players
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="title">NAMES <span class="opt">optional</span></label>
+        <div class="names ai-only">
+          <label class="name-input"><input id="nameMe" maxlength="14" autocomplete="off" placeholder="Your name"></label>
+        </div>
+        <div class="names pvp-only">
+          <label class="name-input"><span class="piece red"></span><input id="name0" maxlength="14" autocomplete="off"></label>
+          <label class="name-input"><span class="piece blue"></span><input id="name1" maxlength="14" autocomplete="off"></label>
         </div>
       </div>
       <div class="field ai-only" id="sideField">
-        <label class="title">אני משחק</label>
+        <label class="title">PLAY AS</label>
         <div class="seg">
-          <input type="radio" name="side" id="s-red" value="0" checked><label for="s-red" id="sideLabel0"></label>
-          <input type="radio" name="side" id="s-blue" value="1"><label for="s-blue" id="sideLabel1"></label>
+          <input type="radio" name="side" id="s-red" value="0" checked>
+          <label for="s-red"><span class="piece red mini"></span><span><span id="sideLabel0"></span><small>moves first</small></span></label>
+          <input type="radio" name="side" id="s-blue" value="1">
+          <label for="s-blue"><span class="piece blue mini"></span><span><span id="sideLabel1"></span><small>moves second</small></span></label>
         </div>
       </div>
       <div class="field ai-only" id="levelField">
-        <label class="title">רמת קושי</label>
-        <div class="seg">
-          <input type="radio" name="level" id="l-1" value="1"><label for="l-1">קל</label>
-          <input type="radio" name="level" id="l-2" value="2" checked><label for="l-2">בינוני</label>
-          <input type="radio" name="level" id="l-3" value="3"><label for="l-3">קשה</label>
+        <label class="title">DIFFICULTY</label>
+        <div class="track">
+          <input type="radio" name="level" id="l-1" value="1"><label for="l-1"><span class="pips" data-n="1"><i></i><i></i><i></i></span>Easy</label>
+          <input type="radio" name="level" id="l-2" value="2" checked><label for="l-2"><span class="pips" data-n="2"><i></i><i></i><i></i></span>Medium</label>
+          <input type="radio" name="level" id="l-3" value="3"><label for="l-3"><span class="pips" data-n="3"><i></i><i></i><i></i></span>Hard</label>
         </div>
       </div>
-      <button type="submit" class="primary">התחל</button>
+      <button type="submit" class="primary">Start</button>
     </form>
   </div>
 
@@ -288,8 +368,8 @@
       <div class="chip win-chip" id="winChip"></div>
       <h2 id="winText"></h2>
       <p class="win-sub" id="winSub"></p>
-      <button class="primary" id="againBtn">משחק חדש</button>
-      <button id="viewBtn">הצג את הלוח</button>
+      <button class="primary" id="againBtn">New game</button>
+      <button id="viewBtn">View board</button>
     </div>
   </div>
 
@@ -304,10 +384,10 @@ const COLORS = ["var(--p0)", "var(--p1)"];
 // Visual skins: the palette lives in CSS under [data-skin]; here only the player
 // names (which change with the piece colors) and the swatch preview.
 const SKINS = {
-  walnut:  { label: "עץ",     names: ["אדום", "כחול"],    meta: "#efe9e1", sw: ["#8f603c", "#9e2b25", "#22406a"] },
-  minimal: { label: "מינימלי", names: ["שחור", "לבן"],     meta: "#f4f4f2", sw: ["#d9d9d4", "#1a1a1a", "#fbfbfb"] },
-  night:   { label: "לילה",   names: ["ענבר", "טורקיז"],  meta: "#0e1116", sw: ["#1d232e", "#e3a23f", "#3fb8ac"] },
-  clay:    { label: "חימר",   names: ["טרקוטה", "זית"],   meta: "#ebe5da", sw: ["#b8a88d", "#b4533a", "#56694a"] },
+  walnut:  { label: "Wood",    names: ["Red", "Blue"],    meta: "#efe9e1", sw: ["#8f603c", "#9e2b25", "#22406a"] },
+  minimal: { label: "Minimal", names: ["Black", "White"],     meta: "#f4f4f2", sw: ["#d9d9d4", "#1a1a1a", "#fbfbfb"] },
+  night:   { label: "Night",   names: ["Amber", "Teal"],  meta: "#0e1116", sw: ["#1d232e", "#e3a23f", "#3fb8ac"] },
+  clay:    { label: "Clay",    names: ["Terracotta", "Olive"],   meta: "#ebe5da", sw: ["#b8a88d", "#b4533a", "#56694a"] },
 };
 let NAMES = SKINS.walnut.names;
 
@@ -512,6 +592,7 @@ const state = {
   winner: null,
   busy: false,      // AI thinking or animating
   moves: 0,
+  names: {},        // {me, 0, 1} typed-in player names
 };
 
 const zoneOf = new Array(N * N).fill(null);
@@ -559,21 +640,21 @@ function render() {
     if (jumps.includes(i)) addHint(sq, "jump");
   }
   turnChip.style.background = COLORS[state.turn];
-  moveCount.textContent = state.moves ? `מהלך ${state.moves}` : "";
+  moveCount.textContent = state.moves ? `Move ${state.moves}` : "";
   if (state.winner != null) {
-    statusText.textContent = `ה${NAMES[state.winner]} ניצח`;
+    statusText.textContent = state.mode === "ai" ? (state.winner === state.human ? "You win" : "Computer wins") : `${label(state.winner)} wins`;
     turnChip.style.background = COLORS[state.winner];
   } else if (state.busy && !isHumanTurn()) {
-    statusText.textContent = "המחשב חושב…";
+    statusText.textContent = "Computer is thinking…";
   } else if (state.chain) {
-    statusText.textContent = "אפשר להמשיך לקפוץ, או לסיים את התור";
+    statusText.textContent = "Keep jumping, or end your turn";
   } else if (state.mode === "ai") {
-    statusText.textContent = "התור שלך";
+    statusText.textContent = state.names.me ? `Your turn, ${state.names.me}` : "Your turn";
   } else {
-    statusText.textContent = `תור ה${NAMES[state.turn]}`;
+    statusText.textContent = `${label(state.turn)}’s turn`;
   }
   if (state.winner == null && isHumanTurn() && state.moves >= HOME_DEADLINE - 20 && homeLeft(b, state.turn)) {
-    statusText.textContent += ` · להוציא את כל החיילים מהפינה עד מהלך ${HOME_DEADLINE}!`;
+    statusText.textContent += ` · Clear your starting corner by move ${HOME_DEADLINE}!`;
   }
   endTurnBtn.classList.toggle("show", !!state.chain);
   undoBtn.disabled = state.busy || (state.history.length === 0 && !state.chain);
@@ -738,43 +819,54 @@ function restore(snap) {
 function showWin() {
   const w = state.winner;
   let text;
-  if (state.mode === "ai") text = w === state.human ? "ניצחת" : "המחשב ניצח";
-  else text = `ה${NAMES[w]} ניצח`;
+  if (state.mode === "ai") text = w === state.human ? "You win" : "Computer wins";
+  else text = `${label(w)} wins`;
   document.getElementById("winChip").style.background = COLORS[w];
   document.getElementById("winText").textContent = text;
   document.getElementById("winSub").textContent = state.blocked
-    ? `ל${NAMES[1 - w]} נשארו חיילים בפינת הפתיחה אחרי מהלך ${HOME_DEADLINE}`
-    : `אחרי ${state.moves} מהלכים`;
+    ? `${label(1 - w)} still had a piece in the starting corner after move ${HOME_DEADLINE}`
+    : `in ${state.moves} moves`;
   winBox.classList.add("show");
 }
 
-function startGame(mode, human, level) {
+// Display name for a player: a typed-in name, else the piece color (or You/Computer).
+function label(p) {
+  if (state.mode === "ai") return p === state.human ? (state.names.me || "You") : "Computer";
+  return state.names[p] || NAMES[p];
+}
+
+function startGame(mode, human, level, names) {
   Object.assign(state, {
-    board: initialBoard(), turn: RED, mode, human, level,
+    board: initialBoard(), turn: RED, mode, human, level, names,
     selected: null, chain: null, history: [], lastMove: null, winner: null, blocked: false, busy: false, moves: 0,
   });
-  try { localStorage.setItem("game9-setup", JSON.stringify({ mode, human, level })); } catch (e) {}
+  try { localStorage.setItem("game9-setup", JSON.stringify({ mode, human, level, names })); } catch (e) {}
   render();
   maybeAI();
 }
 
 // ----- setup dialog -----
 const form = document.getElementById("setupForm");
+const nameInputs = { me: form.nameMe, 0: form.name0, 1: form.name1 };
 function syncSetup() {
   const ai = form.mode.value === "ai";
   document.querySelectorAll(".ai-only").forEach(el => el.classList.toggle("hidden", !ai));
+  document.querySelectorAll(".pvp-only").forEach(el => el.classList.toggle("hidden", ai));
 }
 form.addEventListener("change", syncSetup);
 form.addEventListener("submit", e => {
   e.preventDefault();
   setupEl.classList.remove("show");
-  startGame(form.mode.value, +form.side.value, +form.level.value);
+  const names = {};
+  for (const k in nameInputs) names[k] = nameInputs[k].value.trim();
+  startGame(form.mode.value, +form.side.value, +form.level.value, names);
 });
 function openSetup() {
   try {
     const saved = JSON.parse(localStorage.getItem("game9-setup") || "null");
     if (saved) {
       form.mode.value = saved.mode; form.side.value = String(saved.human); form.level.value = String(saved.level);
+      for (const k in nameInputs) nameInputs[k].value = (saved.names && saved.names[k]) || "";
     }
   } catch (e) {}
   syncSetup();
@@ -799,8 +891,10 @@ function applySkin(key) {
   document.documentElement.dataset.skin = key in SKINS ? key : "walnut";
   NAMES = skin.names;
   document.querySelector('meta[name="theme-color"]').content = skin.meta;
-  document.getElementById("sideLabel0").textContent = `${NAMES[0]} (ראשון)`;
-  document.getElementById("sideLabel1").textContent = `${NAMES[1]} (שני)`;
+  document.getElementById("sideLabel0").textContent = NAMES[0];
+  document.getElementById("sideLabel1").textContent = NAMES[1];
+  form.name0.placeholder = NAMES[0];
+  form.name1.placeholder = NAMES[1];
   for (const b of skinsEl.children) b.setAttribute("aria-pressed", String(b.dataset.key === key));
   try { localStorage.setItem("game9-skin", key); } catch (e) {}
   render();
