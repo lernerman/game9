@@ -348,7 +348,7 @@
       <h2>How to play</h2>
       <ul>
         <li>Each player has 9 pieces in a 3×3 block in a corner. Players start in opposite corners.</li>
-        <li>On your turn, move one piece: a single step in any direction (diagonals too) to an empty square.</li>
+        <li>On your turn, move one piece: a single step up, down, left or right (not diagonally) to an empty square.</li>
         <li>Or jump over an adjacent piece – yours or your opponent's – up, down, left or right (not diagonally) onto the empty square behind it.</li>
         <li>Jumps can be chained. Stop a chain whenever you like with "End turn" or by tapping the piece.</li>
         <li>Nothing is captured – pieces you jump over stay on the board.</li>
@@ -450,7 +450,7 @@ const TARGET = [HOME[BLUE], HOME[RED]];
 // The far corner each player is heading for, used by the AI's evaluation.
 const GOAL_CORNER = [[0, 7], [7, 0]];
 
-const STEP_DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const STEP_DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
 const JUMP_DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
 const inside = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
 
@@ -533,7 +533,8 @@ function distScore(b, player) {
   for (let i = 0; i < N * N; i++) {
     if (b[i] !== player) continue;
     const r = Math.floor(i / N), c = i % N;
-    const d = Math.max(Math.abs(r - gr), Math.abs(c - gc)) + 0.5 * (Math.abs(r - gr) + Math.abs(c - gc));
+    // Pieces only move orthogonally, so Manhattan distance is the true distance.
+    const d = Math.abs(r - gr) + Math.abs(c - gc);
     sum += d;
     if (d > worst) worst = d;
   }
@@ -579,7 +580,7 @@ function search(b, depth, alpha, beta, toMove, me, moveNo) {
 
 function orderMoves(b, moves, player) {
   const [gr, gc] = GOAL_CORNER[player];
-  const d = i => { const r = Math.floor(i / N), c = i % N; return Math.max(Math.abs(r - gr), Math.abs(c - gc)) + Math.abs(r - gr) + Math.abs(c - gc); };
+  const d = i => { const r = Math.floor(i / N), c = i % N; return Math.abs(r - gr) + Math.abs(c - gc); };
   for (const m of moves) m.gain = d(m.from) - d(m.to);
   moves.sort((a, z) => z.gain - a.gain);
 }
@@ -596,7 +597,9 @@ function chooseAIMove(b, player, level, seen, moveNo) {
     if (outcome(work, player, moveNo) === player) { undoMove(work, m); return m; }
     undoMove(work, m);
   }
-  const depth = level === 1 ? 1 : level === 2 ? 2 : 3;
+  // Even depths end on the opponent's reply and play worse here: Easy looks one
+  // move ahead, Medium and Hard three, and Medium picks loosely among good moves.
+  const depth = level === 1 ? 1 : 3;
   orderMoves(work, moves, player);
   const scored = [];
   let alpha = -Infinity;
@@ -611,8 +614,8 @@ function chooseAIMove(b, player, level, seen, moveNo) {
     if (v > alpha) alpha = v;
   }
   scored.sort((a, z) => z.v - a.v);
-  // Easy level picks loosely among the good moves; others break ties randomly.
-  const slack = level === 1 ? 2.5 : 0.01;
+  // Easy and Medium pick loosely among the good moves; Hard only breaks ties randomly.
+  const slack = level === 1 ? 2.5 : level === 2 ? 1.5 : 0.01;
   const pool = scored.filter(s => s.v >= scored[0].v - slack);
   return pool[Math.floor(Math.random() * pool.length)].m;
 }
