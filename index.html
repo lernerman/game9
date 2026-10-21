@@ -72,16 +72,18 @@
     height: 100vh; height: 100dvh; overflow: hidden;
     padding-top: max(14px, env(safe-area-inset-top, 0px));
     padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
     transition: background-color .3s ease, color .3s ease;
   }
-  .wrap { width: 100%; max-width: 560px; height: 100%; display: flex; flex-direction: column; gap: 12px; }
+  .wrap { width: 100%; max-width: 680px; height: 100%; display: flex; flex-direction: column; gap: 12px; }
+  /* Board and its buttons form one centered block; the board takes all the
+     width it can while leaving room for the button row below it. */
   .board-area {
     flex: 1 1 auto; min-height: 0; container-type: size;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
   }
-  .board-area .board-frame { width: min(100cqw, 100cqh); }
+  .board-area .board-frame, .board-area .controls { width: min(100cqw, 100cqh - 58px); }
 
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .brand h1 {
@@ -126,7 +128,7 @@
   .status .moves { color: var(--muted); font-size: .75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
   .board-frame {
-    background: var(--frame); padding: 8px; border-radius: 10px;
+    background: var(--frame); padding: 6px; border-radius: 10px;
     box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 12px 32px rgba(0,0,0,.14);
   }
   [data-skin="minimal"] .board-frame { padding: 0; border: 1px solid var(--line); box-shadow: none; }
@@ -310,12 +312,13 @@
       </button>
     </header>
 
-    <div class="board-area"><div class="board-frame"><div class="board" id="board"></div></div></div>
-
-    <div class="controls">
-      <button id="endTurn" class="primary">End turn</button>
-      <button id="undoBtn">Undo</button>
-      <button id="newBtn">New game</button>
+    <div class="board-area">
+      <div class="board-frame"><div class="board" id="board"></div></div>
+      <div class="controls">
+        <button id="endTurn" class="primary">End turn</button>
+        <button id="undoBtn">Undo</button>
+        <button id="newBtn">New game</button>
+      </div>
     </div>
   </div>
 
