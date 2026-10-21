@@ -91,19 +91,25 @@
     color: var(--ink);
   }
 
-  .skins { display: flex; gap: 8px; }
-  .skin {
-    width: 28px; height: 28px; padding: 0; flex: none; border-radius: 50%; cursor: pointer;
-    border: 1px solid var(--line); box-shadow: none; position: relative; overflow: hidden;
-    background: var(--sw-board);
+  .icon-btn {
+    flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
+    background: transparent; color: var(--muted); display: grid; place-items: center;
   }
-  .skin::before, .skin::after {
-    content: ""; position: absolute; width: 11px; height: 11px; border-radius: 50%; top: 8px;
+  .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); }
+  .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Theme preview: the skin's board color with its two pieces. */
+  .swatch {
+    width: 26px; height: 26px; flex: none; border-radius: 50%; position: relative; overflow: hidden;
+    background: var(--sw-board); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
   }
-  .skin::before { right: 3px; background: var(--sw-a); }
-  .skin::after { left: 3px; background: var(--sw-b); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
-  .skins .skin:hover:not(:disabled) { background: var(--sw-board); }
-  .skin[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .swatch::before, .swatch::after {
+    content: ""; position: absolute; width: 10px; height: 10px; border-radius: 50%; top: 8px;
+  }
+  .swatch::before { left: 3px; background: var(--sw-a); }
+  .swatch::after { right: 3px; background: var(--sw-b); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+  .seg.grid { flex-wrap: wrap; }
+  .seg.grid label { flex: 1 1 calc(50% - 4px); }
 
   .status {
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
@@ -291,7 +297,9 @@
       <div class="brand">
         <h1>9</h1>
       </div>
-      <div class="skins" id="skins" role="group" aria-label="Theme"></div>
+      <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+      </button>
     </header>
 
     <div class="status">
@@ -308,6 +316,25 @@
       <button id="newBtn">New game</button>
       <button id="rulesBtn">Rules</button>
     </div>
+  </div>
+
+  <!-- settings dialog -->
+  <div class="overlay" id="settingsBox">
+    <form class="dialog" id="settingsForm">
+      <h2>Settings</h2>
+      <div class="field">
+        <label class="title">THEME</label>
+        <div class="seg inline grid" id="themeTiles"></div>
+      </div>
+      <div class="field">
+        <label class="title">MOVE HINTS</label>
+        <div class="track">
+          <input type="radio" name="hints" id="h-on" value="1" checked><label for="h-on">Show</label>
+          <input type="radio" name="hints" id="h-off" value="0"><label for="h-off">Hide</label>
+        </div>
+      </div>
+      <button type="button" class="primary" id="settingsClose">Done</button>
+    </form>
   </div>
 
   <!-- rules dialog -->
@@ -653,8 +680,8 @@ function render() {
       if (humanTurn && b[i] === state.turn && !state.chain) p.classList.add("movable");
       sq.appendChild(p);
     }
-    if (steps.includes(i)) addHint(sq, "step");
-    if (jumps.includes(i)) addHint(sq, "jump");
+    if (showHints && steps.includes(i)) addHint(sq, "step");
+    if (showHints && jumps.includes(i)) addHint(sq, "jump");
   }
   turnChip.style.background = COLORS[state.turn];
   moveCount.textContent = state.moves ? `Move ${state.moves}` : "";
@@ -905,8 +932,27 @@ document.getElementById("rulesBtn").addEventListener("click", () => rulesBox.cla
 document.getElementById("rulesClose").addEventListener("click", () => rulesBox.classList.remove("show"));
 rulesBox.addEventListener("click", e => { if (e.target === rulesBox) rulesBox.classList.remove("show"); });
 
-// ----- skins -----
-const skinsEl = document.getElementById("skins");
+// ----- settings: theme and move hints, remembered per browser -----
+const settingsBox = document.getElementById("settingsBox");
+const settingsForm = document.getElementById("settingsForm");
+const themeTiles = document.getElementById("themeTiles");
+const closeSettings = () => settingsBox.classList.remove("show");
+document.getElementById("settingsBtn").addEventListener("click", () => settingsBox.classList.add("show"));
+document.getElementById("settingsClose").addEventListener("click", closeSettings);
+settingsBox.addEventListener("click", e => { if (e.target === settingsBox) closeSettings(); });
+
+let showHints = true;
+try { showHints = localStorage.getItem("game9-hints") !== "0"; } catch (e) {}
+settingsForm.hints.value = showHints ? "1" : "0";
+settingsForm.addEventListener("change", e => {
+  if (e.target.name === "theme") applySkin(e.target.value);
+  if (e.target.name === "hints") {
+    showHints = e.target.value === "1";
+    try { localStorage.setItem("game9-hints", e.target.value); } catch (err) {}
+    render();
+  }
+});
+
 function applySkin(key) {
   const skin = SKINS[key] || SKINS.walnut;
   document.documentElement.dataset.skin = key in SKINS ? key : "walnut";
@@ -916,21 +962,22 @@ function applySkin(key) {
   document.getElementById("sideLabel1").textContent = NAMES[1];
   form.name0.placeholder = NAMES[0];
   form.name1.placeholder = NAMES[1];
-  for (const b of skinsEl.children) b.setAttribute("aria-pressed", String(b.dataset.key === key));
+  settingsForm.theme.value = key;
   try { localStorage.setItem("game9-skin", key); } catch (e) {}
   render();
 }
 for (const [key, s] of Object.entries(SKINS)) {
-  const b = document.createElement("button");
-  b.className = "skin";
-  b.dataset.key = key;
-  b.title = s.label;
-  b.setAttribute("aria-label", s.label);
-  b.style.setProperty("--sw-board", s.sw[0]);
-  b.style.setProperty("--sw-a", s.sw[1]);
-  b.style.setProperty("--sw-b", s.sw[2]);
-  b.addEventListener("click", () => applySkin(key));
-  skinsEl.appendChild(b);
+  const input = document.createElement("input");
+  Object.assign(input, { type: "radio", name: "theme", id: "t-" + key, value: key });
+  const lab = document.createElement("label");
+  lab.htmlFor = input.id;
+  const sw = document.createElement("span");
+  sw.className = "swatch";
+  sw.style.setProperty("--sw-board", s.sw[0]);
+  sw.style.setProperty("--sw-a", s.sw[1]);
+  sw.style.setProperty("--sw-b", s.sw[2]);
+  lab.append(sw, s.label);
+  themeTiles.append(input, lab);
 }
 let savedSkin = null;
 try { savedSkin = localStorage.getItem("game9-skin"); } catch (e) {}
