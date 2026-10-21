@@ -292,9 +292,13 @@
     font: inherit; font-size: 16px; padding: 12px 0;
   }
   .name-input input::placeholder { color: var(--muted); opacity: .8; }
-  .win-chip { width: 44px; height: 44px; margin: 0 auto; }
-  .win-sub { margin: -6px 0 0; text-align: center; color: var(--muted); font-size: .9rem; }
-  .win-sub:empty { display: none; }
+  /* Win dialog: the winner's piece, one line of text, both actions side by side. */
+  .win { gap: 20px; padding-top: 28px; }
+  .win .win-piece { width: 64px; height: 64px; margin: 0 auto; }
+  .overlay.show .win-piece { animation: pop .45s cubic-bezier(.3, 1.6, .5, 1); }
+  @keyframes pop { from { transform: scale(.4) translateY(8px); opacity: 0; } }
+  .win h2 { font-size: 1.5rem; }
+  .win .actions { display: flex; gap: 8px; }
 </style>
 </head>
 <body>
@@ -419,12 +423,13 @@
 
   <!-- win dialog -->
   <div class="overlay" id="winBox">
-    <div class="dialog">
-      <div class="chip win-chip" id="winChip"></div>
+    <div class="dialog win">
+      <div class="piece win-piece" id="winPiece"></div>
       <h2 id="winText"></h2>
-      <p class="win-sub" id="winSub"></p>
-      <button class="primary" id="againBtn">New game</button>
-      <button id="viewBtn">View board</button>
+      <div class="actions">
+        <button id="viewBtn">View board</button>
+        <button class="primary" id="againBtn">New game</button>
+      </div>
     </div>
   </div>
 
@@ -874,9 +879,8 @@ function showWin() {
   let text;
   if (state.mode === "ai") text = w === state.human ? "You win" : "Computer wins";
   else text = `${label(w)} wins`;
-  document.getElementById("winChip").style.background = COLORS[w];
+  document.getElementById("winPiece").className = "piece win-piece " + (w === RED ? "red" : "blue");
   document.getElementById("winText").textContent = text;
-  document.getElementById("winSub").textContent = `in ${state.moves} moves`;
   winBox.classList.add("show");
 }
 
