@@ -590,6 +590,16 @@ function orderMoves(b, moves, player) {
   moves.sort((a, z) => z.gain - a.gain);
 }
 
+// Difficulty: how many plies to search (even depths end on the opponent's reply
+// and play worse here, so levels use 1 or 3), how far below the best score a move
+// may be and still get picked, and how often to play a random move that doesn't
+// retreat instead of a good one.
+const LEVELS = {
+  1: { depth: 1, slack: 0.01, mistakes: 0.8 },
+  2: { depth: 3, slack: 0.01, mistakes: 0.7 },
+  3: { depth: 3, slack: 0.01, mistakes: 0 },
+};
+
 // `seen` maps board keys to how often each position already occurred; repeating
 // positions is penalised so the computer doesn't shuffle back and forth forever.
 function chooseAIMove(b, player, level, seen) {
@@ -601,10 +611,13 @@ function chooseAIMove(b, player, level, seen) {
     if (outcome(work, player) === player) { undoMove(work, m); return m; }
     undoMove(work, m);
   }
-  // Even depths end on the opponent's reply and play worse here: Easy looks one
-  // move ahead, Medium and Hard three, and Medium picks loosely among good moves.
-  const depth = level === 1 ? 1 : 3;
+  const { depth, slack, mistakes } = LEVELS[level];
   orderMoves(work, moves, player);
+  if (Math.random() < mistakes) {
+    const loose = moves.filter(m => m.gain >= 0);
+    const from = loose.length ? loose : moves;
+    return from[Math.floor(Math.random() * from.length)];
+  }
   const scored = [];
   let alpha = -Infinity;
   for (const m of moves) {
@@ -618,8 +631,6 @@ function chooseAIMove(b, player, level, seen) {
     if (v > alpha) alpha = v;
   }
   scored.sort((a, z) => z.v - a.v);
-  // Easy and Medium pick loosely among the good moves; Hard only breaks ties randomly.
-  const slack = level === 1 ? 2.5 : level === 2 ? 1.5 : 0.01;
   const pool = scored.filter(s => s.v >= scored[0].v - slack);
   return pool[Math.floor(Math.random() * pool.length)].m;
 }
