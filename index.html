@@ -81,18 +81,19 @@
     transition: background-color .3s ease, color .3s ease;
   }
   .wrap { width: 100%; max-width: 680px; height: 100%; display: flex; flex-direction: column; gap: 12px; }
-  /* Board and its buttons form one block at the top; the board takes all the
-     width it can while leaving room for the button row below it. */
+  /* Header, board and buttons share one width; the board takes all the room it
+     can while leaving space for the header above and the button row below. */
   .board-area {
     flex: 1 1 auto; min-height: 0; container-type: size;
     display: flex; flex-direction: column; align-items: center; gap: 10px;
   }
-  .board-area .board-frame, .board-area .controls { width: min(100cqw, 100cqh - 58px); }
+  .board-area > * { width: min(100cqw, 100cqh - 116px); flex: none; }
 
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .brand h1 { margin: 0; line-height: 0; }
   .brand h1 img { width: 48px; height: 48px; object-fit: contain; display: block; }
 
+  .top .icon-btn { margin-inline-end: -9px; }
   .icon-btn {
     flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
     background: transparent; color: var(--muted); display: grid; place-items: center;
@@ -298,21 +299,20 @@
 </head>
 <body>
   <div class="wrap">
-    <header class="top">
-      <div class="brand">
-        <h1><img src="icon-192.png" alt="9" width="48" height="48"></h1>
-      </div>
-      <div class="status">
-        <div class="chip" id="turnChip"></div>
-        <div class="text" id="statusText"></div>
-        <div class="moves" id="moveCount"></div>
-      </div>
-      <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
-      </button>
-    </header>
-
     <div class="board-area">
+      <header class="top">
+        <div class="brand">
+          <h1><img src="icon-192.png" alt="9" width="48" height="48"></h1>
+        </div>
+        <div class="status">
+          <div class="chip" id="turnChip"></div>
+          <div class="text" id="statusText"></div>
+          <div class="moves" id="moveCount"></div>
+        </div>
+        <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+        </button>
+      </header>
       <div class="board-frame"><div class="board" id="board"></div></div>
       <div class="controls">
         <button id="endTurn" class="primary">End turn</button>
