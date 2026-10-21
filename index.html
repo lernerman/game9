@@ -313,7 +313,6 @@
       <button id="endTurn" class="primary">End turn</button>
       <button id="undoBtn">Undo</button>
       <button id="newBtn">New game</button>
-      <button id="rulesBtn">Rules</button>
     </div>
   </div>
 
@@ -332,6 +331,7 @@
           <input type="radio" name="hints" id="h-off" value="0"><label for="h-off">Hide</label>
         </div>
       </div>
+      <button type="button" id="rulesBtn">How to play</button>
       <button type="button" class="primary" id="settingsClose">Done</button>
     </form>
   </div>
@@ -927,7 +927,10 @@ document.getElementById("viewBtn").addEventListener("click", () => winBox.classL
 endTurnBtn.addEventListener("click", () => { if (state.chain) finishTurn(); });
 undoBtn.addEventListener("click", undo);
 const rulesBox = document.getElementById("rulesBox");
-document.getElementById("rulesBtn").addEventListener("click", () => rulesBox.classList.add("show"));
+document.getElementById("rulesBtn").addEventListener("click", () => {
+  settingsBox.classList.remove("show");
+  rulesBox.classList.add("show");
+});
 document.getElementById("rulesClose").addEventListener("click", () => rulesBox.classList.remove("show"));
 rulesBox.addEventListener("click", e => { if (e.target === rulesBox) rulesBox.classList.remove("show"); });
 
