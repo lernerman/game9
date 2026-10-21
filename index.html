@@ -199,9 +199,10 @@
   .overlay.show { display: flex; }
   .dialog {
     background: var(--panel); border-radius: 14px;
-    /* A clear outer frame in the skin's accent. */
+    /* Double rule: a firm outer frame in the skin's accent and a finer line just inside it. */
     border: 2px solid var(--accent);
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 14%, transparent), 0 20px 60px rgba(0,0,0,.25);
+    box-shadow: inset 0 0 0 4px var(--panel), inset 0 0 0 5px color-mix(in srgb, var(--accent) 55%, transparent),
+                0 20px 60px rgba(0,0,0,.25);
     padding: 24px; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px;
   }
   .dialog h2 { margin: 0; text-align: center; font-weight: 500; font-size: 1.35rem; letter-spacing: .01em; }
