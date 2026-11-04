@@ -85,7 +85,7 @@
     flex: 1 1 auto; min-height: 0; container-type: size;
     display: flex; flex-direction: column; align-items: center; gap: 10px;
   }
-  .board-area > * { width: min(100cqw, 100cqh - 116px); flex: none; }
+  .board-area > * { width: min(100cqw, 100cqh - 144px); flex: none; }
 
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .brand h1 { margin: 0; line-height: 0; }
@@ -124,7 +124,17 @@
   }
   .status .chip { width: 22px; height: 22px; }
   .status .text { flex: 1; min-width: 0; font-size: .92rem; line-height: 1.25; }
-  .status .moves { color: var(--muted); font-size: .75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* Level, stopwatch and move count, in one line so they show up in a screenshot. */
+  .stats {
+    display: flex; justify-content: space-between; align-items: baseline; padding-inline: 4px;
+    color: var(--muted); font-size: .85rem; line-height: 18px; font-variant-numeric: tabular-nums;
+  }
+  .stats.idle { visibility: hidden; }
+  .stats > * { flex: 1; }
+  .stats #statLevel { color: var(--ink); font-weight: 500; }
+  .stats #clock { text-align: center; }
+  .stats #moveCount { text-align: end; }
 
   .board-frame {
     background: var(--frame); padding: 6px; border-radius: 10px;
@@ -299,6 +309,7 @@
   .overlay.show .win-piece { animation: pop .45s cubic-bezier(.3, 1.6, .5, 1); }
   @keyframes pop { from { transform: scale(.4) translateY(8px); opacity: 0; } }
   .win h2 { font-size: 1.5rem; }
+  .win .win-stats { margin: 0; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
   .win .actions { display: flex; gap: 8px; }
 </style>
 </head>
@@ -312,12 +323,16 @@
         <div class="status">
           <div class="chip" id="turnChip"></div>
           <div class="text" id="statusText"></div>
-          <div class="moves" id="moveCount"></div>
         </div>
         <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
         </button>
       </header>
+      <div class="stats idle" id="stats">
+        <span id="statLevel"></span>
+        <span id="clock"></span>
+        <span id="moveCount"></span>
+      </div>
       <div class="board-frame"><div class="board" id="board"></div></div>
       <div class="controls">
         <button id="endTurn" class="primary">End turn</button>
@@ -428,6 +443,7 @@
     <div class="dialog win">
       <div class="piece win-piece" id="winPiece"></div>
       <h2 id="winText"></h2>
+      <p class="win-stats" id="winStats"></p>
       <div class="actions">
         <button id="viewBtn">View board</button>
         <button class="primary" id="againBtn">New game</button>
@@ -601,9 +617,9 @@ function orderMoves(b, moves, player) {
 // advance when there are any (stronger as well as more natural); and, for deep
 // searches, a time budget in ms after which the 3-ply answer is used instead.
 const LEVELS = {
-  1: { depth: 1, blunder: 0.5, forward: true },
-  2: { depth: 3, blunder: 0.4, forward: true },
-  3: { depth: 5, blunder: 0, forward: true, budget: 1200 },
+  1: { name: "Easy", depth: 1, blunder: 0.5, forward: true },
+  2: { name: "Medium", depth: 3, blunder: 0.4, forward: true },
+  3: { name: "Hard", depth: 5, blunder: 0, forward: true, budget: 1200 },
 };
 
 const TIMEOUT = {};
@@ -687,7 +703,28 @@ const state = {
   busy: false,      // AI thinking or animating
   moves: 0,
   names: {},        // {me, 0, 1} typed-in player names
+  started: false,   // false until the first game starts
 };
+
+// Stopwatch: counts playing time only, so it stops on a win and while the app is
+// in the background. Undo doesn't rewind it, and undoing a win resumes it.
+const stats = document.getElementById("stats");
+const clockEl = document.getElementById("clock");
+let clockBanked = 0, clockFrom = null;
+const clockMs = () => clockBanked + (clockFrom == null ? 0 : performance.now() - clockFrom);
+function startClock() { if (clockFrom == null) clockFrom = performance.now(); }
+function stopClock() { clockBanked = clockMs(); clockFrom = null; }
+function clockText() {
+  const t = Math.floor(clockMs() / 1000);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+}
+const movesText = () => `${state.moves} ${state.moves === 1 ? "move" : "moves"}`;
+const levelText = () => state.mode === "ai" ? LEVELS[state.level].name : "2 players";
+setInterval(() => { clockEl.textContent = clockText(); }, 250);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopClock();
+  else if (state.started && state.winner == null) startClock();
+});
 
 const zoneOf = new Array(N * N).fill(null);
 TARGET[RED].forEach(i => zoneOf[i] = "zone-red");
@@ -742,7 +779,10 @@ function render() {
     if (showHints && jumps.includes(i)) addHint(sq, "jump");
   }
   turnChip.style.background = COLORS[state.turn];
-  moveCount.textContent = state.moves ? `Move ${state.moves}` : "";
+  stats.classList.toggle("idle", !state.started);
+  document.getElementById("statLevel").textContent = levelText();
+  clockEl.textContent = clockText();
+  moveCount.textContent = movesText();
   if (state.winner != null) {
     statusText.textContent = state.mode === "ai" ? (state.winner === state.human ? "You win" : "Computer wins") : `${label(state.winner)} wins`;
     turnChip.style.background = COLORS[state.winner];
@@ -826,6 +866,7 @@ function endTurn() {
   const w = outcome(state.board, state.turn);
   if (w != null) {
     state.winner = w;
+    stopClock();
     render();
     setTimeout(showWin, 350);
     return;
@@ -899,6 +940,7 @@ function undo() {
   // Against the computer, rewind to the human's previous turn.
   while (state.mode === "ai" && snap.turn !== state.human && state.history.length) snap = state.history.pop();
   restore(snap);
+  startClock();
   winBox.classList.remove("show");
   render();
   maybeAI();
@@ -916,8 +958,9 @@ function restore(snap) {
 function showWin() {
   const w = state.winner;
   let text;
-  if (state.mode === "ai") text = w === state.human ? "You win" : "Computer wins";
+  if (state.mode === "ai") text = w === state.human ? `${label(w)} beat ${levelText()}` : `${levelText()} wins`;
   else text = `${label(w)} wins`;
+  document.getElementById("winStats").textContent = `${clockText()} · ${movesText()}`;
   document.getElementById("winPiece").className = "piece win-piece " + (w === RED ? "red" : "blue");
   document.getElementById("winText").textContent = text;
   winBox.classList.add("show");
@@ -932,8 +975,10 @@ function label(p) {
 function startGame(mode, human, level, names) {
   Object.assign(state, {
     board: initialBoard(), turn: RED, mode, human, level, names,
-    selected: null, chain: null, history: [], lastMove: null, winner: null, busy: false, moves: 0,
+    selected: null, chain: null, history: [], lastMove: null, winner: null, busy: false, moves: 0, started: true,
   });
+  clockBanked = 0; clockFrom = null;
+  startClock();
   try { localStorage.setItem("game9-setup", JSON.stringify({ mode, human, level, names })); } catch (e) {}
   render();
   maybeAI();
