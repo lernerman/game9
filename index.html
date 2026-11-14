@@ -148,6 +148,10 @@
     border-radius: 4px; overflow: hidden; position: relative;
     user-select: none; touch-action: manipulation;
   }
+  /* Playing Blue against the computer, the board turns so your corner is at the bottom
+     (unless the "Fixed" setting is on).
+     Each square turns back so pieces and highlights stay upright. */
+  .board.flipped, .board.flipped > * { transform: rotate(180deg); }
   .sq { position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   .sq.light { background: var(--light-sq); }
   .sq.dark { background: var(--dark-sq); }
@@ -362,6 +366,13 @@
         <div class="track">
           <input type="radio" name="chains" id="c-fwd" value="1" checked><label for="c-fwd">Forward only</label>
           <input type="radio" name="chains" id="c-any" value="0"><label for="c-any">Any direction</label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="title">BOARD VS COMPUTER</label>
+        <div class="track">
+          <input type="radio" name="flip" id="f-me" value="1" checked><label for="f-me">Rotate to me</label>
+          <input type="radio" name="flip" id="f-fixed" value="0"><label for="f-fixed">Fixed</label>
         </div>
       </div>
       <button type="button" id="rulesBtn">How to play</button>
@@ -778,6 +789,7 @@ function render() {
     if (showHints && steps.includes(i)) addHint(sq, "step");
     if (showHints && jumps.includes(i)) addHint(sq, "jump");
   }
+  boardEl.classList.toggle("flipped", flipBoard && state.mode === "ai" && state.human === BLUE);
   turnChip.style.background = COLORS[state.turn];
   stats.classList.toggle("idle", !state.started);
   document.getElementById("statLevel").textContent = levelText();
@@ -1049,6 +1061,9 @@ settingsForm.hints.value = showHints ? "1" : "0";
 let forwardChains = true;
 try { forwardChains = localStorage.getItem("game9-chains") !== "0"; } catch (e) {}
 settingsForm.chains.value = forwardChains ? "1" : "0";
+let flipBoard = true;
+try { flipBoard = localStorage.getItem("game9-flip") !== "0"; } catch (e) {}
+settingsForm.flip.value = flipBoard ? "1" : "0";
 settingsForm.addEventListener("change", e => {
   if (e.target.name === "theme") applySkin(e.target.value);
   if (e.target.name === "hints") {
@@ -1062,6 +1077,11 @@ settingsForm.addEventListener("change", e => {
     // A chain in progress may now have nothing left to continue with.
     if (state.chain && chainJumps(state.board, state.selected).length === 0) finishTurn();
     else render();
+  }
+  if (e.target.name === "flip") {
+    flipBoard = e.target.value === "1";
+    try { localStorage.setItem("game9-flip", e.target.value); } catch (err) {}
+    render();
   }
 });
 
