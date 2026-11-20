@@ -284,6 +284,7 @@
     box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
   }
   .track input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .track .crown { width: 13px; height: 13px; fill: currentColor; flex: none; }
   .pips { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
   .pips i { width: 3px; border-radius: 1px; background: currentColor; opacity: .3; }
   .pips i:nth-child(1) { height: 5px; } .pips i:nth-child(2) { height: 8px; } .pips i:nth-child(3) { height: 12px; }
@@ -511,6 +512,7 @@
             <input type="radio" name="level" id="l-1" value="1"><label for="l-1"><span class="pips" data-n="1"><i></i><i></i><i></i></span>Easy</label>
             <input type="radio" name="level" id="l-2" value="2" checked><label for="l-2"><span class="pips" data-n="2"><i></i><i></i><i></i></span>Medium</label>
             <input type="radio" name="level" id="l-3" value="3"><label for="l-3"><span class="pips" data-n="3"><i></i><i></i><i></i></span>Hard</label>
+            <input type="radio" name="level" id="l-4" value="4"><label for="l-4" class="lvl-haleli"><svg class="crown" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 12h12l1-7-4 3-3-5-3 5-4-3z"/></svg>Haleli</label>
           </div>
         </div>
         <div class="field">
@@ -723,6 +725,8 @@ const LEVELS = {
   1: { name: "Easy", depth: 1, blunder: 0.5, forward: true },
   2: { name: "Medium", depth: 3, blunder: 0.4, forward: true },
   3: { name: "Hard", depth: 5, blunder: 0, forward: true, budget: 1200 },
+  // Haleli uses its own engine (below), searching as deep as 2 seconds allow.
+  4: { name: "Haleli", engine: "haleli", budget: 2000 },
 };
 
 const TIMEOUT = {};
@@ -739,7 +743,8 @@ function chooseAIMove(b, player, level, seen) {
     if (outcome(work, player) === player) { undoMove(work, m); return m; }
     undoMove(work, m);
   }
-  const { depth, blunder, forward, budget } = LEVELS[level];
+  const { depth, blunder, forward, budget, engine } = LEVELS[level];
+  if (engine === "haleli") return chooseHaleliMove(b, player, seen, budget);
   orderMoves(work, moves, player);
   let cands = moves;
   if (forward) {
@@ -780,6 +785,161 @@ function chooseAIMove(b, player, level, seen) {
   }
   const pool = scored.filter(s => s.v >= scored[0].v - 0.01);
   return pool[Math.floor(Math.random() * pool.length)].m;
+}
+
+// ---------- Haleli: the strongest level ----------
+// A separate engine: negamax alpha-beta with iterative deepening inside a time
+// budget, a transposition table keyed by Zobrist hashes, killer moves, and a
+// sharper evaluation that measures how far each side really is from filling its
+// target corner (rows and columns matched to the target squares separately).
+const H_WIN = 100000;
+const H_ROWS = [], H_COLS = [];
+for (const p of [RED, BLUE]) {
+  H_ROWS[p] = TARGET[p].map(i => Math.floor(i / N)).sort((a, z) => a - z);
+  H_COLS[p] = TARGET[p].map(i => i % N).sort((a, z) => a - z);
+}
+// 53-bit Zobrist keys: a 32-bit and a 21-bit random part per (square, color).
+const H_Z = [[], []];
+const hRand = () => Math.floor(Math.random() * 4294967296);
+for (let i = 0; i < N * N; i++) for (const p of [RED, BLUE]) H_Z[p][i] = [hRand(), hRand() & 0x1fffff];
+const H_ZSIDE = [hRand(), hRand() & 0x1fffff];
+function hHash(b, side) {
+  let a = 0, c = 0;
+  for (let i = 0; i < N * N; i++) if (b[i] !== EMPTY) { a ^= H_Z[b[i]][i][0]; c ^= H_Z[b[i]][i][1]; }
+  if (side) { a ^= H_ZSIDE[0]; c ^= H_ZSIDE[1]; }
+  return [a >>> 0, c];
+}
+
+// Remaining distance for `p`: rows of its pieces matched in order to the target
+// rows, and the same for columns. That is a lower bound on the steps still
+// needed, far closer to the truth than distance to the corner.
+function hCost(b, p) {
+  const rows = [], cols = [];
+  let inT = 0, worst = 0;
+  const [gr, gc] = GOAL_CORNER[p];
+  for (let i = 0; i < N * N; i++) {
+    if (b[i] !== p) continue;
+    const r = Math.floor(i / N), c = i % N;
+    rows.push(r); cols.push(c);
+    const d = Math.abs(r - gr) + Math.abs(c - gc);
+    if (d > worst) worst = d;
+  }
+  for (const i of TARGET[p]) if (b[i] === p) inT++;
+  rows.sort((a, z) => a - z); cols.sort((a, z) => a - z);
+  const tr = H_ROWS[p], tc = H_COLS[p];
+  let s = 0;
+  for (let k = 0; k < rows.length; k++) s += Math.abs(rows[k] - tr[k]) + Math.abs(cols[k] - tc[k]);
+  // A straggler far behind costs extra: it can't ride the others' jumps at the end.
+  return s + 0.35 * worst - 0.8 * inT;
+}
+function hEval(b, side) {
+  // The side to move is roughly one step ahead.
+  return hCost(b, 1 - side) - hCost(b, side) + 0.9;
+}
+
+function hOrder(moves, player, ttBest, killers) {
+  const [gr, gc] = GOAL_CORNER[player];
+  const d = i => Math.abs(Math.floor(i / N) - gr) + Math.abs(i % N - gc);
+  for (const m of moves) {
+    let s = d(m.from) - d(m.to);
+    if (ttBest && m.from === ttBest.from && m.to === ttBest.to) s += 1000;
+    else if (killers && killers.some(k => k && k.from === m.from && k.to === m.to)) s += 50;
+    m.hs = s;
+  }
+  moves.sort((a, z) => z.hs - a.hs);
+}
+
+function chooseHaleliMove(b, player, seen, budget) {
+  const work = b.slice();
+  const rootMoves = allMoves(work, player);
+  if (!rootMoves.length) return null;
+  for (const m of rootMoves) {
+    applyMove(work, m);
+    if (outcome(work, player) === player) { undoMove(work, m); return m; }
+    undoMove(work, m);
+  }
+  const tt = new Map();
+  const killers = [];
+  const end = performance.now() + budget;
+  let nodes = 0;
+  let [ha, hc] = hHash(work, player);
+  const key = () => ha * 2097152 + hc;
+  const flip = (p, i) => { ha = (ha ^ H_Z[p][i][0]) >>> 0; hc ^= H_Z[p][i][1]; };
+  const side = () => { ha = (ha ^ H_ZSIDE[0]) >>> 0; hc ^= H_ZSIDE[1]; };
+  const doMove = m => { const p = work[m.from]; flip(p, m.from); flip(p, m.to); applyMove(work, m); side(); };
+  const unMove = m => { side(); undoMove(work, m); const p = work[m.from]; flip(p, m.from); flip(p, m.to); };
+
+  function negamax(depth, alpha, beta, toMove, ply) {
+    if ((++nodes & 1023) === 0 && performance.now() > end) throw TIMEOUT;
+    const w = outcome(work, 1 - toMove);
+    if (w != null) return w === toMove ? H_WIN - ply : -(H_WIN - ply);
+    if (depth <= 0) return hEval(work, toMove);
+    const k = key();
+    const e = tt.get(k);
+    if (e && e.d >= depth) {
+      if (e.f === 0) return e.v;
+      if (e.f === 1 && e.v >= beta) return e.v;
+      if (e.f === -1 && e.v <= alpha) return e.v;
+    }
+    const moves = allMoves(work, toMove);
+    if (!moves.length) {
+      side();
+      const v = -negamax(depth - 1, -beta, -alpha, 1 - toMove, ply + 1);
+      side();
+      return v;
+    }
+    hOrder(moves, toMove, e && e.m, killers[ply]);
+    const a0 = alpha;
+    let best = -Infinity, bestM = null, first = true;
+    for (const m of moves) {
+      doMove(m);
+      let v;
+      if (first) v = -negamax(depth - 1, -beta, -alpha, 1 - toMove, ply + 1);
+      else {
+        v = -negamax(depth - 1, -alpha - 0.001, -alpha, 1 - toMove, ply + 1);
+        if (v > alpha && v < beta) v = -negamax(depth - 1, -beta, -alpha, 1 - toMove, ply + 1);
+      }
+      unMove(m);
+      first = false;
+      if (v > best) { best = v; bestM = m; }
+      if (v > alpha) alpha = v;
+      if (alpha >= beta) {
+        const ks = killers[ply] || (killers[ply] = [null, null]);
+        if (!(ks[0] && ks[0].from === m.from && ks[0].to === m.to)) { ks[1] = ks[0]; ks[0] = m; }
+        break;
+      }
+    }
+    tt.set(k, { d: depth, v: best, f: best <= a0 ? -1 : best >= beta ? 1 : 0, m: bestM && { from: bestM.from, to: bestM.to } });
+    return best;
+  }
+
+  let bestMove = rootMoves[0], lastScores = null;
+  for (let depth = 1; depth <= 30; depth++) {
+    try {
+      const prev = lastScores;
+      if (prev) rootMoves.sort((a, z) => (prev.get(z) ?? -Infinity) - (prev.get(a) ?? -Infinity));
+      else hOrder(rootMoves, player, null, null);
+      const scores = new Map();
+      let alpha = -Infinity, best = -Infinity, bm = null;
+      for (const m of rootMoves) {
+        doMove(m);
+        let v = -negamax(depth - 1, -Infinity, -alpha + 0.001, 1 - player, 1);
+        // Repeating an earlier position is penalised so the game keeps moving.
+        if (seen) v -= 3 * (seen.get(work.join("")) || 0);
+        unMove(m);
+        scores.set(m, v);
+        if (v > best) { best = v; bm = m; }
+        if (v > alpha) alpha = v;
+      }
+      bestMove = bm; lastScores = scores;
+      if (best >= H_WIN - 50 || best <= -(H_WIN - 50)) break;   // forced result found
+    } catch (e) {
+      if (e !== TIMEOUT) throw e;
+      break;
+    }
+    if (performance.now() > end) break;
+  }
+  return bestMove;
 }
 
 // ---------- UI ----------
