@@ -292,6 +292,14 @@
 
   .dialog button[type="submit"] { padding-block: 14px; font-size: 1.05rem; margin-top: 4px; }
   [data-show].hidden { display: none; }
+  /* The computer is thinking: the turn chip breathes and three dots ripple. */
+  .status.thinking .chip { animation: think 1.6s ease-in-out infinite; }
+  @keyframes think { 50% { transform: scale(.78); opacity: .55; } }
+  .dots i { font-style: normal; animation: dot 1.4s ease-in-out infinite; opacity: .15; }
+  .dots i:nth-child(2) { animation-delay: .2s; }
+  .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes dot { 30% { opacity: 1; } 60% { opacity: .15; } }
+  @media (prefers-reduced-motion: reduce) { .status.thinking .chip, .dots i { animation: none; opacity: 1; } }
   /* Three mode tiles share one row on a phone: keep each label on one line. */
   #setupForm > .field:first-of-type .seg label { padding-inline: 4px; white-space: nowrap; }
   .join-btn { flex: 0 0 auto; padding-inline: 18px; }
@@ -556,7 +564,7 @@
     </div>
   </div>
 
-<script>
+<script id="engine-src">
 "use strict";
 // ---------- Engine ----------
 // Board is 8x8, index = r*8 + c, row 0 is the top. Cells: -1 empty, 0 red, 1 blue.
@@ -725,8 +733,10 @@ const LEVELS = {
   1: { name: "Easy", depth: 1, blunder: 0.5, forward: true },
   2: { name: "Medium", depth: 3, blunder: 0.4, forward: true },
   3: { name: "Hard", depth: 5, blunder: 0, forward: true, budget: 1200 },
-  // Haleli uses its own engine (below), searching as deep as 2 seconds allow.
-  4: { name: "Haleli", engine: "haleli", budget: 2000 },
+  // Haleli uses its own engine (below). It always finishes a 6-ply search, so a
+  // slow phone plays as strong as a fast one, just a little slower; deeper plies
+  // only while about 2 s allow, and never more than 9 s in all.
+  4: { name: "Haleli", engine: "haleli", minDepth: 6, softMs: 2000, maxMs: 9000 },
 };
 
 const TIMEOUT = {};
@@ -744,7 +754,7 @@ function chooseAIMove(b, player, level, seen) {
     undoMove(work, m);
   }
   const { depth, blunder, forward, budget, engine } = LEVELS[level];
-  if (engine === "haleli") return chooseHaleliMove(b, player, seen, budget);
+  if (engine === "haleli") return chooseHaleliMove(b, player, seen, LEVELS[level]);
   orderMoves(work, moves, player);
   let cands = moves;
   if (forward) {
@@ -849,7 +859,7 @@ function hOrder(moves, player, ttBest, killers) {
   moves.sort((a, z) => z.hs - a.hs);
 }
 
-function chooseHaleliMove(b, player, seen, budget) {
+function chooseHaleliMove(b, player, seen, opts) {
   const work = b.slice();
   const rootMoves = allMoves(work, player);
   if (!rootMoves.length) return null;
@@ -860,7 +870,8 @@ function chooseHaleliMove(b, player, seen, budget) {
   }
   const tt = new Map();
   const killers = [];
-  const end = performance.now() + budget;
+  const start = performance.now();
+  let end = start + opts.maxMs;
   let nodes = 0;
   let [ha, hc] = hHash(work, player);
   const key = () => ha * 2097152 + hc;
@@ -915,6 +926,9 @@ function chooseHaleliMove(b, player, seen, budget) {
 
   let bestMove = rootMoves[0], lastScores = null;
   for (let depth = 1; depth <= 30; depth++) {
+    // Up to the minimum depth the search may use the whole cap; beyond it, only
+    // what is left of the soft budget.
+    end = start + (depth <= opts.minDepth ? opts.maxMs : opts.softMs);
     try {
       const prev = lastScores;
       if (prev) rootMoves.sort((a, z) => (prev.get(z) ?? -Infinity) - (prev.get(a) ?? -Infinity));
@@ -937,15 +951,21 @@ function chooseHaleliMove(b, player, seen, budget) {
       if (e !== TIMEOUT) throw e;
       break;
     }
-    if (performance.now() > end) break;
+    const used = performance.now() - start;
+    // Each extra ply costs a few times the last one: don't start one that can't finish.
+    if (depth >= opts.minDepth && used * 3 > opts.softMs) break;
   }
   return bestMove;
 }
 
+</script>
+<script>
+"use strict";
 // ---------- UI ----------
 const boardEl = document.getElementById("board");
 const statusText = document.getElementById("statusText");
 const turnChip = document.getElementById("turnChip");
+const statusEl = turnChip.parentElement;
 const moveCount = document.getElementById("moveCount");
 const endTurnBtn = document.getElementById("endTurn");
 const undoBtn = document.getElementById("undoBtn");
@@ -1047,6 +1067,7 @@ function render() {
   }
   boardEl.classList.toggle("flipped", flipBoard && (state.mode === "ai" || state.mode === "online") && state.human === BLUE);
   turnChip.style.background = COLORS[state.turn];
+  statusEl.classList.toggle("thinking", state.mode === "ai" && state.busy && !isHumanTurn() && state.winner == null);
   stats.classList.toggle("idle", !state.started);
   document.getElementById("statLevel").textContent = levelText();
   clockEl.textContent = clockText();
@@ -1065,7 +1086,7 @@ function render() {
       : state.turn === state.human ? "Your turn"
       : `${label(state.turn)} is playing…`;
   } else if (state.busy && !isHumanTurn()) {
-    statusText.textContent = "Computer is thinking…";
+    statusText.innerHTML = `${state.level === 4 ? "Haleli" : "Computer"} is thinking<span class="dots"><i>.</i><i>.</i><i>.</i></span>`;
   } else if (state.chain) {
     statusText.textContent = "Keep jumping, or end your turn";
   } else if (state.mode === "ai") {
@@ -1170,9 +1191,12 @@ function maybeAI() {
     const t0 = performance.now();
     const seen = new Map();
     for (const k of state.history.map(h => h.board.join("")).concat(state.board.join(""))) seen.set(k, (seen.get(k) || 0) + 1);
-    const m = chooseAIMove(state.board, state.turn, state.level, seen);
+    const token = aiToken;
+    pickAIMove(state.board, state.turn, state.level, seen, m => {
+    if (token !== aiToken) return;   // a new game started while it was thinking
     const wait = Math.max(0, 450 - (performance.now() - t0));
     setTimeout(() => {
+      if (token !== aiToken) return;
       if (!m) { state.busy = false; state.turn = 1 - state.turn; return render(); }
       pushHistory();
       animatePath(m.path, state.board[m.from], () => {
@@ -1182,7 +1206,33 @@ function maybeAI() {
         endTurn();
       });
     }, wait);
+    });
   }, 30);
+}
+
+// Haleli thinks in a background worker built from the engine script, so the page
+// stays smooth (and the thinking indicator keeps moving) however long it takes.
+// Other levels, or a browser without workers, compute on the page as before.
+let aiToken = 0, hWorker = null, hReqId = 0;
+const hPending = new Map();
+function haleliWorker() {
+  if (hWorker === null) {
+    try {
+      const src = document.getElementById("engine-src").textContent +
+        "\nonmessage = e => { const d = e.data; postMessage({ id: d.id, m: chooseHaleliMove(d.board, d.player, new Map(d.seen), d.opts) }); };";
+      hWorker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+      hWorker.onmessage = e => { const cb = hPending.get(e.data.id); hPending.delete(e.data.id); if (cb) cb(e.data.m); };
+      hWorker.onerror = () => { hWorker = false; for (const [, cb] of hPending) cb(undefined); hPending.clear(); };
+    } catch (e) { hWorker = false; }
+  }
+  return hWorker;
+}
+function pickAIMove(board, player, level, seen, done) {
+  const w = LEVELS[level].engine === "haleli" && haleliWorker();
+  if (!w) return done(chooseAIMove(board, player, level, seen));
+  const id = ++hReqId;
+  hPending.set(id, m => done(m === undefined ? chooseAIMove(board, player, level, seen) : m));
+  w.postMessage({ id, board: board.slice(), player, seen: [...seen], opts: LEVELS[level] });
 }
 
 function animatePath(path, color, done) {
@@ -1266,6 +1316,7 @@ function label(p) {
 
 function startGame(mode, human, level, names) {
   leaveOnline();
+  aiToken++;
   Object.assign(state, {
     board: initialBoard(), turn: RED, mode, human, level, names,
     selected: null, chain: null, history: [], lastMove: null, winner: null, busy: false, moves: 0, started: true,
