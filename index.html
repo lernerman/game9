@@ -91,7 +91,7 @@
   .brand h1 { margin: 0; line-height: 0; }
   .brand h1 img { width: 48px; height: 48px; object-fit: contain; display: block; }
 
-  .top .icon-btn { margin-inline-end: 2px; }
+  .top-actions { display: flex; gap: 0; margin-inline-end: 2px; }
   .icon-btn {
     flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
     background: transparent; color: var(--muted); display: grid; place-items: center;
@@ -290,7 +290,44 @@
   .pips[data-n="1"] i:nth-child(-n+1), .pips[data-n="2"] i:nth-child(-n+2), .pips[data-n="3"] i { opacity: 1; }
 
   .dialog button[type="submit"] { padding-block: 14px; font-size: 1.05rem; margin-top: 4px; }
-  .ai-only.hidden, .pvp-only.hidden { display: none; }
+  [data-show].hidden { display: none; }
+  /* Three mode tiles share one row on a phone: keep each label on one line. */
+  #setupForm > .field:first-of-type .seg label { padding-inline: 4px; white-space: nowrap; }
+  .join-btn { flex: 0 0 auto; padding-inline: 18px; }
+  #joinCode { text-transform: uppercase; letter-spacing: .2em; font-variant-numeric: tabular-nums; }
+  #joinCode::placeholder { letter-spacing: .2em; }
+
+  /* Online invite / joining dialog */
+  .online { text-align: center; }
+  .online-sub { margin: -6px 0 0; color: var(--muted); line-height: 1.45; }
+  .online-sub:empty, .online .code:empty { display: none; }
+  .online .code {
+    font-size: 2.4rem; font-weight: 600; letter-spacing: .22em; font-variant-numeric: tabular-nums;
+    color: var(--accent); padding: 6px 0 2px; user-select: all; -webkit-user-select: all;
+  }
+  .online .code.pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .win .win-note { margin: -8px 0 0; text-align: center; color: var(--accent); font-weight: 500; }
+  .win .win-note:empty { display: none; }
+  #rematchBtn { display: none; }
+  .profile { max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .records { width: 100%; border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
+  .records th { font-weight: 500; color: var(--muted); font-size: .72rem; text-align: center; padding: 0 2px 6px; }
+  .records td { text-align: center; padding: 8px 2px; border-top: 1px solid var(--line); }
+  .records td:first-child, .records th:first-child { text-align: start; }
+  .records td:first-child { font-weight: 500; }
+  .online-rec { display: flex; gap: 8px; }
+  .online-rec div { flex: 1; text-align: center; padding: 10px 4px; border-radius: 12px;
+    background: color-mix(in srgb, var(--ink) 4%, var(--panel)); }
+  .online-rec b { display: block; font-family: "Fraunces", Georgia, serif; font-size: 1.5rem; font-weight: 600; color: var(--accent); }
+  .online-rec span { font-size: .75rem; color: var(--muted); }
+  .profile-note { margin: 0; text-align: center; color: var(--muted); font-size: .85rem; }
+  .profile-note:empty { display: none; }
+  .link-btn { background: none; border: 0; color: var(--muted); font-size: .85rem; text-decoration: underline; padding: 0; margin-top: -6px; }
+  .link-btn:hover:not(:disabled) { background: none; color: var(--ink); }
+  .win.online-end #rematchBtn { display: block; }
+  .win.online-end #viewBtn { display: none; }
+  .win.online-end #againBtn { background: var(--panel); color: var(--ink); border-color: var(--line); }
 
   .names { display: flex; gap: 8px; }
   .name-input {
@@ -328,9 +365,14 @@
           <div class="chip" id="turnChip"></div>
           <div class="text" id="statusText"></div>
         </div>
+        <div class="top-actions">
+        <button class="icon-btn" id="profileBtn" aria-label="My stats" title="My stats">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/></svg>
+        </button>
         <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
         </button>
+        </div>
       </header>
       <div class="stats idle" id="stats">
         <span id="statLevel"></span>
@@ -369,7 +411,7 @@
         </div>
       </div>
       <div class="field">
-        <label class="title">BOARD VS COMPUTER</label>
+        <label class="title">BOARD ORIENTATION</label>
         <div class="track">
           <input type="radio" name="flip" id="f-me" value="1" checked><label for="f-me">Rotate to me</label>
           <input type="radio" name="flip" id="f-fixed" value="0"><label for="f-fixed">Fixed</label>
@@ -378,6 +420,31 @@
       <button type="button" id="rulesBtn">How to play</button>
       <button type="button" class="primary" id="settingsClose">Done</button>
     </form>
+  </div>
+
+  <!-- profile / records dialog -->
+  <div class="overlay" id="profileBox">
+    <div class="dialog profile">
+      <h2>My stats</h2>
+      <div class="field">
+        <label class="title">NICKNAME</label>
+        <label class="name-input"><input id="nickInput" maxlength="14" autocomplete="off" placeholder="Your name"></label>
+      </div>
+      <div class="field">
+        <label class="title">VS COMPUTER</label>
+        <table class="records" id="aiRecords">
+          <thead><tr><th></th><th>Won</th><th>Lost</th><th>Best time</th><th>Fewest moves</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="field">
+        <label class="title">ONLINE</label>
+        <div class="online-rec" id="onlineRecord"></div>
+      </div>
+      <p class="profile-note" id="profileNote"></p>
+      <button type="button" class="primary" id="profileClose">Done</button>
+      <button type="button" class="link-btn" id="deleteMe">Delete my data</button>
+    </div>
   </div>
 
   <!-- rules dialog -->
@@ -403,7 +470,7 @@
     <form class="dialog" id="setupForm">
       <h2>New game</h2>
       <div class="field">
-        <div class="seg inline">
+        <div class="seg">
           <input type="radio" name="mode" id="m-ai" value="ai">
           <label for="m-ai">
             <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="6" width="24" height="16" rx="2.5"/><path d="M12 27h8M16 22v5"/><circle cx="12" cy="14" r="2"/><circle cx="20" cy="14" r="2"/></svg>
@@ -414,10 +481,22 @@
             <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="11" cy="11" r="4"/><path d="M4 26c0-4 3-7 7-7s7 3 7 7"/><circle cx="22" cy="12" r="3.2"/><path d="M19.5 19.6c.8-.4 1.6-.6 2.5-.6 3.3 0 6 2.6 6 6"/></svg>
             Two players
           </label>
+          <input type="radio" name="mode" id="m-online" value="online">
+          <label for="m-online">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11"/><path d="M5 16h22M16 5c3 3.2 4.5 6.8 4.5 11S19 23.8 16 27M16 5c-3 3.2-4.5 6.8-4.5 11S13 23.8 16 27"/></svg>
+            Online
+          </label>
         </div>
       </div>
       <div class="after-mode">
-        <div class="field ai-only" id="sideField">
+        <div class="field" data-show="online">
+          <label class="title">HAVE A CODE? <span class="opt">join a friend's game</span></label>
+          <div class="names">
+            <label class="name-input"><input id="joinCode" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDE"></label>
+            <button type="button" id="joinBtn" class="join-btn" disabled>Join</button>
+          </div>
+        </div>
+        <div class="field" data-show="ai online" id="sideField">
           <label class="title">PLAY AS</label>
           <div class="seg inline">
             <input type="radio" name="side" id="s-red" value="0" checked>
@@ -426,7 +505,7 @@
             <label for="s-blue"><span class="piece blue mini"></span><span id="sideLabel1"></span><span class="order" title="Moves second">2<sup>nd</sup></span></label>
           </div>
         </div>
-        <div class="field ai-only" id="levelField">
+        <div class="field" data-show="ai" id="levelField">
           <label class="title">DIFFICULTY</label>
           <div class="track">
             <input type="radio" name="level" id="l-1" value="1"><label for="l-1"><span class="pips" data-n="1"><i></i><i></i><i></i></span>Easy</label>
@@ -435,11 +514,11 @@
           </div>
         </div>
         <div class="field">
-          <label class="title"><span class="ai-only">YOUR NAME</span><span class="pvp-only">NAMES</span> <span class="opt">optional</span></label>
-          <div class="names ai-only">
+          <label class="title"><span data-show="ai online">YOUR NAME</span><span data-show="pvp">NAMES</span> <span class="opt">optional</span></label>
+          <div class="names" data-show="ai online">
             <label class="name-input"><input id="nameMe" maxlength="14" autocomplete="off" placeholder="Your name"></label>
           </div>
-          <div class="names pvp-only">
+          <div class="names" data-show="pvp">
             <label class="name-input"><span class="piece red"></span><input id="name0" maxlength="14" autocomplete="off"></label>
             <label class="name-input"><span class="piece blue"></span><input id="name1" maxlength="14" autocomplete="off"></label>
           </div>
@@ -455,10 +534,23 @@
       <div class="piece win-piece" id="winPiece"></div>
       <h2 id="winText"></h2>
       <p class="win-stats" id="winStats"></p>
+      <p class="win-note" id="winNote"></p>
       <div class="actions">
         <button id="viewBtn">View board</button>
+        <button id="rematchBtn" class="primary">Rematch</button>
         <button class="primary" id="againBtn">New game</button>
       </div>
+    </div>
+  </div>
+
+  <!-- online: invite code / joining / errors -->
+  <div class="overlay" id="onlineBox">
+    <div class="dialog online">
+      <h2 id="onlineTitle"></h2>
+      <p class="online-sub" id="onlineSub"></p>
+      <div class="code" id="onlineCode"></div>
+      <button class="primary" id="shareBtn">Share invite</button>
+      <button id="onlineCancel">Cancel</button>
     </div>
   </div>
 
@@ -730,7 +822,8 @@ function clockText() {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }
 const movesText = () => `${state.moves} ${state.moves === 1 ? "move" : "moves"}`;
-const levelText = () => state.mode === "ai" ? LEVELS[state.level].name : "2 players";
+const levelText = () => state.mode === "ai" ? LEVELS[state.level].name
+  : state.mode === "online" ? `Online · ${state.online ? state.online.code : ""}` : "2 players";
 setInterval(() => { clockEl.textContent = clockText(); }, 250);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) stopClock();
@@ -751,7 +844,8 @@ for (let i = 0; i < N * N; i++) {
   cells.push(sq);
 }
 
-const isHumanTurn = () => state.mode === "pvp" || state.turn === state.human;
+const isHumanTurn = () => state.mode === "pvp" ||
+  (state.turn === state.human && !(state.mode === "online" && (!state.online || state.online.game.status !== "playing")));
 
 function legalFromSelected() {
   const b = state.board, s = state.selected;
@@ -764,7 +858,9 @@ function legalFromSelected() {
 // while a jump brings the piece closer to its goal; otherwise the turn ends.
 function chainJumps(b, pos) {
   const all = jumpTargets(b, pos, state.chain.visited);
-  if (!forwardChains) return all;
+  // Online, both players follow the rule the host had when creating the game.
+  const forward = state.mode === "online" && state.online ? state.online.forward : forwardChains;
+  if (!forward) return all;
   const [gr, gc] = GOAL_CORNER[state.turn];
   const dist = i => Math.abs(Math.floor(i / N) - gr) + Math.abs(i % N - gc);
   return all.filter(i => dist(i) < dist(pos));
@@ -789,15 +885,25 @@ function render() {
     if (showHints && steps.includes(i)) addHint(sq, "step");
     if (showHints && jumps.includes(i)) addHint(sq, "jump");
   }
-  boardEl.classList.toggle("flipped", flipBoard && state.mode === "ai" && state.human === BLUE);
+  boardEl.classList.toggle("flipped", flipBoard && (state.mode === "ai" || state.mode === "online") && state.human === BLUE);
   turnChip.style.background = COLORS[state.turn];
   stats.classList.toggle("idle", !state.started);
   document.getElementById("statLevel").textContent = levelText();
   clockEl.textContent = clockText();
   moveCount.textContent = movesText();
   if (state.winner != null) {
-    statusText.textContent = state.mode === "ai" ? (state.winner === state.human ? "You win" : "Computer wins") : `${label(state.winner)} wins`;
+    statusText.textContent = state.mode === "ai" ? (state.winner === state.human ? "You win" : "Computer wins")
+      : state.mode === "online" ? (state.winner === state.human ? "You win" : `${label(state.winner)} wins`)
+      : `${label(state.winner)} wins`;
     turnChip.style.background = COLORS[state.winner];
+  } else if (state.mode === "online") {
+    const o = state.online, g = o && o.game;
+    statusText.textContent = !g || g.status === "waiting" ? "Waiting for your friend…"
+      : g.status === "abandoned" ? "Game cancelled"
+      : o.sending ? "Sending…"
+      : state.chain ? "Keep jumping, or end your turn"
+      : state.turn === state.human ? "Your turn"
+      : `${label(state.turn)} is playing…`;
   } else if (state.busy && !isHumanTurn()) {
     statusText.textContent = "Computer is thinking…";
   } else if (state.chain) {
@@ -808,7 +914,8 @@ function render() {
     statusText.textContent = `${label(state.turn)}’s turn`;
   }
   endTurnBtn.classList.toggle("show", !!state.chain);
-  undoBtn.disabled = state.busy || (state.history.length === 0 && !state.chain);
+  // Online, Undo only cancels a jump chain that hasn't been sent yet.
+  undoBtn.disabled = state.busy || (state.mode === "online" ? !state.chain : (state.history.length === 0 && !state.chain));
 }
 
 function addHint(sq, kind) {
@@ -881,6 +988,8 @@ function endTurn() {
     stopClock();
     render();
     setTimeout(showWin, 350);
+    if (state.mode === "online") sendTurn();
+    else recordResult();
     return;
   }
   state.turn = 1 - state.turn;
@@ -889,7 +998,8 @@ function endTurn() {
     state.turn = 1 - state.turn;
   }
   render();
-  maybeAI();
+  if (state.mode === "online") sendTurn();
+  else maybeAI();
 }
 
 function maybeAI() {
@@ -947,7 +1057,7 @@ function undo() {
     state.chain = null;
     return render();
   }
-  if (!state.history.length) return;
+  if (state.mode === "online" || !state.history.length) return;
   let snap = state.history.pop();
   // Against the computer, rewind to the human's previous turn.
   while (state.mode === "ai" && snap.turn !== state.human && state.history.length) snap = state.history.pop();
@@ -970,8 +1080,13 @@ function restore(snap) {
 function showWin() {
   const w = state.winner;
   let text;
+  const online = state.mode === "online";
   if (state.mode === "ai") text = w === state.human ? `${label(w)} beat ${levelText()}` : `${levelText()} wins`;
+  else if (online) text = w === state.human ? "You win" : `${label(w)} wins`;
   else text = `${label(w)} wins`;
+  winBox.querySelector(".win").classList.toggle("online-end", online);
+  if (online) updateWinNote();
+  else document.getElementById("winNote").textContent = "";
   document.getElementById("winStats").textContent = `${clockText()} · ${movesText()}`;
   document.getElementById("winPiece").className = "piece win-piece " + (w === RED ? "red" : "blue");
   document.getElementById("winText").textContent = text;
@@ -981,10 +1096,16 @@ function showWin() {
 // Display name for a player: a typed-in name, else the piece color (or You/Computer).
 function label(p) {
   if (state.mode === "ai") return p === state.human ? (state.names.me || "You") : "Computer";
+  if (state.mode === "online") {
+    const g = state.online && state.online.game;
+    const n = g && (p === RED ? g.red_name : g.blue_name);
+    return p === state.human ? (n || "You") : (n || NAMES[p]);
+  }
   return state.names[p] || NAMES[p];
 }
 
 function startGame(mode, human, level, names) {
+  leaveOnline();
   Object.assign(state, {
     board: initialBoard(), turn: RED, mode, human, level, names,
     selected: null, chain: null, history: [], lastMove: null, winner: null, busy: false, moves: 0, started: true,
@@ -1000,16 +1121,46 @@ function startGame(mode, human, level, names) {
 const form = document.getElementById("setupForm");
 const nameInputs = { me: form.nameMe, 0: form.name0, 1: form.name1 };
 function syncSetup() {
-  const ai = form.mode.value === "ai";
-  form.classList.toggle("has-mode", !!form.mode.value);
-  document.getElementById("startBtn").disabled = !form.mode.value;
-  document.querySelectorAll(".ai-only").forEach(el => el.classList.toggle("hidden", !ai));
-  document.querySelectorAll(".pvp-only").forEach(el => el.classList.toggle("hidden", ai));
+  const mode = form.mode.value;
+  form.classList.toggle("has-mode", !!mode);
+  const startBtn = document.getElementById("startBtn");
+  startBtn.disabled = !mode;
+  startBtn.textContent = mode === "online" ? "Create game & invite" : "Start";
+  document.querySelectorAll("#setupForm [data-show]").forEach(el =>
+    el.classList.toggle("hidden", !el.dataset.show.split(" ").includes(mode)));
+  syncJoin();
+}
+const joinInput = document.getElementById("joinCode");
+const joinBtn = document.getElementById("joinBtn");
+const cleanCode = s => s.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+function syncJoin() { joinBtn.disabled = cleanCode(joinInput.value).length !== 5; }
+joinInput.addEventListener("input", () => { joinInput.value = cleanCode(joinInput.value); syncJoin(); });
+joinInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); if (!joinBtn.disabled) joinBtn.click(); } });
+joinBtn.addEventListener("click", () => {
+  setupEl.classList.remove("show");
+  saveSetupNames();
+  syncProfile(nameInputs.me.value.trim());
+  joinOnline(cleanCode(joinInput.value), nameInputs.me.value.trim());
+});
+function saveSetupNames() {
+  const names = {};
+  for (const k in nameInputs) names[k] = nameInputs[k].value.trim();
+  try {
+    const saved = JSON.parse(localStorage.getItem("game9-setup") || "null") || { mode: "ai", human: 0, level: 2 };
+    saved.names = names;
+    localStorage.setItem("game9-setup", JSON.stringify(saved));
+  } catch (e) {}
+  return names;
 }
 form.addEventListener("change", syncSetup);
 form.addEventListener("submit", e => {
   e.preventDefault();
   setupEl.classList.remove("show");
+  if (form.mode.value === "online") {
+    saveSetupNames();
+    syncProfile(nameInputs.me.value.trim());
+    return createOnline(+form.side.value, nameInputs.me.value.trim());
+  }
   const names = {};
   for (const k in nameInputs) names[k] = nameInputs[k].value.trim();
   startGame(form.mode.value, +form.side.value, +form.level.value, names);
@@ -1029,7 +1180,15 @@ function openSetup() {
   setupEl.classList.add("show");
 }
 
-document.getElementById("newBtn").addEventListener("click", openSetup);
+document.getElementById("newBtn").addEventListener("click", () => {
+  const g = state.mode === "online" && state.online && state.online.game;
+  if (g && g.status === "playing" && state.winner == null) {
+    if (!confirm("Leave this online game? It counts as a loss.")) return;
+    resignOnline();
+  }
+  if (state.mode === "online") leaveOnline();
+  openSetup();
+});
 document.getElementById("againBtn").addEventListener("click", openSetup);
 document.getElementById("viewBtn").addEventListener("click", () => winBox.classList.remove("show"));
 // Tapping outside a dialog closes it. Closing the first new-game dialog leaves
@@ -1115,7 +1274,416 @@ let savedSkin = null;
 try { savedSkin = localStorage.getItem("game9-skin"); } catch (e) {}
 applySkin(savedSkin || (matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "walnut"));
 
-openSetup();
+// ---------- Online play and personal records (Supabase) ----------
+// Every device gets an anonymous account on first use (no sign-up). An online game is a
+// row in `games`; moves go through server functions that check whose turn it is, and both
+// players follow the row through Realtime, with polling as a fallback.
+const SB_URL = "https://hvsbtfqjqwnjfszyfrjp.supabase.co";
+const SB_KEY = "sb_publishable_GATMp1I2l1ynxPua-l0Avw_qoqO74BW";
+let sbPromise = null, myId = null;
+function getSb() {
+  if (!sbPromise) {
+    sbPromise = new Promise((resolve, reject) => {
+      if (window.supabase) return resolve();
+      const s = document.createElement("script");
+      s.src = "vendor/supabase.js";
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("offline"));
+      document.head.appendChild(s);
+    }).then(async () => {
+      const sb = window.supabase.createClient(SB_URL, SB_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, storageKey: "game9-auth", detectSessionInUrl: false },
+      });
+      let { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        const { data, error } = await sb.auth.signInAnonymously();
+        if (error) throw error;
+        session = data.session;
+      }
+      myId = session.user.id;
+      return sb;
+    });
+    sbPromise.catch(() => { sbPromise = null; });
+  }
+  return sbPromise;
+}
+
+const onlineBox = document.getElementById("onlineBox");
+const onlineCode = document.getElementById("onlineCode");
+const shareBtn = document.getElementById("shareBtn");
+const onlineCancel = document.getElementById("onlineCancel");
+// kind: "invite" (code + share), "busy" (spinner text only), "error" (message + OK)
+function showOnline(kind, title, sub, code) {
+  document.getElementById("onlineTitle").textContent = title;
+  document.getElementById("onlineSub").textContent = sub || "";
+  onlineCode.textContent = code || "";
+  onlineCode.classList.toggle("pulse", kind === "busy" && !!code);
+  shareBtn.style.display = kind === "invite" ? "" : "none";
+  shareBtn.textContent = "Share invite";
+  onlineCancel.style.display = kind === "busy" ? "none" : "";
+  onlineCancel.textContent = kind === "error" ? "OK" : "Cancel";
+  onlineBox.dataset.kind = kind;
+  setupEl.classList.remove("show");
+  winBox.classList.remove("show");
+  onlineBox.classList.add("show");
+}
+const hideOnline = () => onlineBox.classList.remove("show");
+
+function onlineError(e, during) {
+  const msg = String((e && e.message) || e);
+  let sub = "Check your internet connection and try again.";
+  if (/no such game/.test(msg)) sub = "There's no game with that code. Check the letters and try again.";
+  else if (/game full/.test(msg)) sub = "That game already has two players.";
+  else if (/rematch cancelled|opponent left/.test(msg)) sub = "Your opponent isn't available for a rematch.";
+  showOnline("error", during || "Couldn't connect", sub);
+}
+
+const inviteUrl = code => `https://haleli9.com/?join=${code}`;
+shareBtn.addEventListener("click", async () => {
+  const code = state.online && state.online.code;
+  if (!code) return;
+  const url = inviteUrl(code);
+  const text = `Play 9 with me! Open the link, or enter code ${code} under New game → Online.`;
+  try {
+    if (navigator.share) return await navigator.share({ title: "9 - Board Game", text, url });
+  } catch (e) { if (e && e.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(`${text}\n${url}`); shareBtn.textContent = "Link copied"; }
+  catch (e) { shareBtn.textContent = url; }
+});
+onlineCancel.addEventListener("click", () => {
+  const kind = onlineBox.dataset.kind;
+  hideOnline();
+  if (kind === "invite" || kind === "wait") { resignOnline(); leaveOnline(); openSetup(); }
+  else if (kind === "error" && state.mode !== "online") openSetup();
+});
+
+async function createOnline(color, name) {
+  showOnline("busy", "Creating game…");
+  try {
+    const sb = await getSb();
+    const { data: code, error } = await sb.rpc("create_game", {
+      p_color: color, p_name: name || null, p_forward: forwardChains, p_board: initialBoard(),
+    });
+    if (error) throw error;
+    const { data: g, error: e2 } = await sb.from("games").select("*").eq("code", code).single();
+    if (e2) throw e2;
+    enterOnline(g);
+  } catch (e) { onlineError(e, "Couldn't create the game"); }
+}
+
+async function joinOnline(code, name) {
+  showOnline("busy", "Joining…", "", code);
+  try {
+    const sb = await getSb();
+    const { data: g, error } = await sb.rpc("join_game", { p_code: code, p_name: name || null });
+    if (error) throw error;
+    enterOnline(g);
+  } catch (e) { onlineError(e, "Couldn't join"); }
+}
+
+async function loadGame(code) {
+  const sb = await getSb();
+  const { data, error } = await sb.from("games").select("*").eq("code", code).single();
+  if (error) throw error;
+  return data;
+}
+
+function enterOnline(g) {
+  leaveOnline();
+  const human = g.red === myId ? RED : BLUE;
+  Object.assign(state, {
+    board: g.board.slice(), turn: g.turn, mode: "online", human, names: {},
+    selected: null, chain: null, history: [], lastMove: g.last_move, busy: false, moves: g.moves, started: true,
+    winner: g.status === "finished" ? g.winner : null,
+  });
+  state.online = { code: g.code, ply: g.ply, forward: g.forward, game: g, sending: false, channel: null, poll: null };
+  clockBanked = 0; clockFrom = null;
+  try { localStorage.setItem("game9-online", g.code); } catch (e) {}
+  subscribe(g.code);
+  if (g.status === "waiting") {
+    // A rematch has both seats filled and waits for the other player to accept.
+    if (g.red && g.blue) showOnline("wait", "Rematch", `Waiting for ${label(1 - human)} to accept…`);
+    else showInvite();
+  }
+  else { hideOnline(); if (state.winner == null) startClock(); }
+  render();
+  if (state.winner != null) setTimeout(showWin, 200);
+}
+
+function showInvite() {
+  showOnline("invite", "Invite a friend",
+    "Send them this code or the invite link. The game starts as soon as they join.", state.online.code);
+}
+
+async function subscribe(code) {
+  const o = state.online;
+  try {
+    const sb = await getSb();
+    if (state.online !== o) return;
+    o.channel = sb.channel("game-" + code)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "games", filter: `code=eq.${code}` },
+        p => onGame(p.new))
+      .subscribe(status => { if (status === "SUBSCRIBED") refreshGame(); });
+  } catch (e) {}
+  // Fallback for dropped realtime connections (backgrounded phones, flaky networks).
+  o.poll = setInterval(() => {
+    if (document.hidden || state.online !== o || o.sending) return;
+    const g = o.game;
+    if (g.status === "waiting" || (g.status === "playing" && state.turn !== state.human) || (g.status === "finished" && !g.rematch)) refreshGame();
+  }, 4000);
+}
+
+async function refreshGame() {
+  const o = state.online;
+  if (!o) return;
+  try { const g = await loadGame(o.code); if (state.online === o) onGame(g); } catch (e) {}
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && state.mode === "online") refreshGame(); });
+
+function onGame(g) {
+  const o = state.online;
+  if (!o || g.code !== o.code) return;
+  const prev = o.game;
+  // Ignore stale poll responses.
+  if (g.ply < prev.ply || new Date(g.updated_at) < new Date(prev.updated_at)) return;
+  o.game = g;
+  o.forward = g.forward;
+  if (prev.status === "waiting" && g.status !== "waiting") {
+    hideOnline();
+    clockBanked = 0; clockFrom = null;
+    if (g.status === "playing") startClock();
+  }
+  if (g.ply > o.ply && !o.sending && !state.busy) {
+    const path = g.last_move && g.last_move.path;
+    const animate = g.ply === o.ply + 1 && path && state.board[path[0]] !== EMPTY && !state.chain;
+    o.ply = g.ply;
+    const finish = () => {
+      Object.assign(state, { board: g.board.slice(), turn: g.turn, moves: g.moves, lastMove: g.last_move,
+        selected: null, chain: null, busy: false });
+      afterSync(g);
+    };
+    if (animate) { state.busy = true; state.selected = null; animatePath(path, state.board[path[0]], finish); }
+    else finish();
+    return;
+  }
+  afterSync(g);
+}
+
+function afterSync(g) {
+  if (g.status === "finished" && state.winner == null) {
+    state.winner = g.winner;
+    stopClock();
+    render();
+    setTimeout(showWin, 350);
+    return;
+  }
+  if (winBox.classList.contains("show")) updateWinNote();
+  else if (g.rematch && state.winner != null && !state.online.askedRematch) showWin();
+  render();
+}
+
+function updateWinNote() {
+  const o = state.online, g = o && o.game, note = document.getElementById("winNote");
+  const rb = document.getElementById("rematchBtn");
+  if (!g) return;
+  const opp = label(1 - state.human);
+  let text = "";
+  if (g.ended_by === "resign") text = g.winner === state.human ? `${opp} left the game` : "You left the game";
+  if (g.rematch && !o.askedRematch) text = `${opp} wants a rematch`;
+  note.textContent = text;
+  rb.textContent = g.rematch && !o.askedRematch ? "Accept rematch" : o.askedRematch ? "Starting…" : "Rematch";
+  rb.disabled = !!o.askedRematch;
+  // No rematch with someone who left the game.
+  rb.style.display = g.ended_by === "resign" && g.winner === state.human ? "none" : "";
+}
+
+async function sendTurn() {
+  const o = state.online;
+  if (!o) return;
+  o.sending = true;
+  render();
+  const body = { p_code: o.code, p_ply: o.ply, p_board: state.board.slice(), p_turn: state.turn,
+    p_last: state.lastMove, p_winner: state.winner };
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const sb = await getSb();
+      const { data: g, error } = await sb.rpc("submit_turn", body);
+      if (error) {
+        // The server disagrees (e.g. the game ended or a duplicate send): take its version.
+        if (/out of sync|not your turn|not active|not your game/.test(error.message)) {
+          o.sending = false;
+          const fresh = await loadGame(o.code);
+          o.ply = fresh.ply;
+          Object.assign(state, { board: fresh.board.slice(), turn: fresh.turn, moves: fresh.moves, lastMove: fresh.last_move,
+            winner: fresh.status === "finished" ? fresh.winner : null, selected: null, chain: null });
+          o.game = fresh;
+          return render();
+        }
+        throw error;
+      }
+      if (state.online !== o) return;
+      o.ply = g.ply;
+      o.game = g;
+      o.sending = false;
+      return render();
+    } catch (e) {
+      if (state.online !== o) return;
+      statusText.textContent = "Connection problem, retrying…";
+      await new Promise(r => setTimeout(r, Math.min(8000, 1500 * (attempt + 1))));
+    }
+  }
+}
+
+async function resignOnline() {
+  const o = state.online;
+  if (!o) return;
+  try { const sb = await getSb(); await sb.rpc("resign_game", { p_code: o.code }); } catch (e) {}
+}
+
+function leaveOnline() {
+  const o = state.online;
+  if (!o) return;
+  if (o.poll) clearInterval(o.poll);
+  if (o.channel && sbPromise) sbPromise.then(sb => sb.removeChannel(o.channel)).catch(() => {});
+  state.online = null;
+  try { localStorage.removeItem("game9-online"); } catch (e) {}
+}
+
+document.getElementById("rematchBtn").addEventListener("click", async () => {
+  const o = state.online;
+  if (!o) return;
+  o.askedRematch = true;
+  updateWinNote();
+  try {
+    const sb = await getSb();
+    const { data: code, error } = await sb.rpc("rematch_game", { p_code: o.code, p_board: initialBoard() });
+    if (error) throw error;
+    winBox.classList.remove("show");
+    enterOnline(await loadGame(code));
+  } catch (e) { o.askedRematch = false; onlineError(e, "Couldn't start a rematch"); }
+});
+
+// Personal records: every finished game against the computer is saved to the account.
+// Results wait in localStorage until they reach the server, so offline games still count.
+function pendingResults() { try { return JSON.parse(localStorage.getItem("game9-pending") || "[]"); } catch (e) { return []; } }
+function setPending(a) { try { localStorage.setItem("game9-pending", JSON.stringify(a.slice(-200))); } catch (e) {} }
+function recordResult() {
+  if (state.mode !== "ai") return;
+  setPending(pendingResults().concat({ kind: "ai", level: state.level, color: state.human,
+    won: state.winner === state.human, ms: Math.round(clockMs()), moves: state.moves }));
+  flushResults().catch(() => {});
+}
+async function flushResults() {
+  const rows = pendingResults();
+  if (!rows.length) return;
+  const sb = await getSb();
+  const { error } = await sb.from("results").insert(rows);
+  if (error) throw error;
+  setPending(pendingResults().slice(rows.length));
+}
+
+// ----- My stats: nickname, records, delete my data -----
+const profileBox = document.getElementById("profileBox");
+const nickInput = document.getElementById("nickInput");
+const profileNote = document.getElementById("profileNote");
+function savedNick() {
+  try { return ((JSON.parse(localStorage.getItem("game9-setup") || "null") || {}).names || {}).me || ""; } catch (e) { return ""; }
+}
+async function syncProfile(nick) {
+  try { const sb = await getSb(); await sb.from("profiles").upsert({ id: myId, nickname: (nick || "Player").slice(0, 20) }); } catch (e) {}
+}
+nickInput.addEventListener("change", () => {
+  const n = nickInput.value.trim();
+  nameInputs.me.value = n;
+  saveSetupNames();
+  if (state.mode === "ai") state.names.me = n;
+  render();
+  syncProfile(n);
+});
+const fmtMs = ms => { const t = Math.round(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
+async function openProfile() {
+  settingsBox.classList.remove("show");
+  winBox.classList.remove("show");
+  nickInput.value = savedNick();
+  profileNote.textContent = "Loading…";
+  renderRecords([]);
+  profileBox.classList.add("show");
+  try {
+    await flushResults().catch(() => {});
+    const sb = await getSb();
+    const { data, error } = await sb.from("results").select("kind,level,won,ms,moves").limit(5000);
+    if (error) throw error;
+    renderRecords(data);
+    profileNote.textContent = data.length ? "" : "Finish a game to start your stats.";
+  } catch (e) {
+    renderRecords(pendingResults());
+    profileNote.textContent = "Connect to the internet to see all your stats.";
+  }
+}
+function renderRecords(rows) {
+  const body = document.querySelector("#aiRecords tbody");
+  body.innerHTML = "";
+  for (const lv of Object.keys(LEVELS)) {
+    const mine = rows.filter(r => r.kind === "ai" && String(r.level) === lv);
+    const wins = mine.filter(r => r.won);
+    const best = wins.length ? fmtMs(Math.min(...wins.map(r => r.ms || Infinity))) : "–";
+    const fewest = wins.length ? Math.min(...wins.map(r => r.moves || Infinity)) : "–";
+    const tr = document.createElement("tr");
+    for (const v of [LEVELS[lv].name, wins.length, mine.length - wins.length, best, fewest]) {
+      const td = document.createElement("td"); td.textContent = v; tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+  const on = rows.filter(r => r.kind === "online"), won = on.filter(r => r.won).length;
+  document.getElementById("onlineRecord").innerHTML =
+    `<div><b>${on.length}</b><span>Played</span></div><div><b>${won}</b><span>Won</span></div>` +
+    `<div><b>${on.length ? Math.round(100 * won / on.length) + "%" : "–"}</b><span>Win rate</span></div>`;
+}
+document.getElementById("profileBtn").addEventListener("click", openProfile);
+document.getElementById("profileClose").addEventListener("click", () => profileBox.classList.remove("show"));
+profileBox.addEventListener("click", e => { if (e.target === profileBox) profileBox.classList.remove("show"); });
+document.getElementById("deleteMe").addEventListener("click", async () => {
+  if (!confirm("Delete your stats, nickname and online games from our server? This can't be undone.")) return;
+  profileNote.textContent = "Deleting…";
+  try {
+    if (state.mode === "online") { await resignOnline(); leaveOnline(); }
+    const sb = await getSb();
+    const { error } = await sb.rpc("delete_me");
+    if (error) throw error;
+    await sb.auth.signOut({ scope: "local" }).catch(() => {});
+    sbPromise = null; myId = null;
+    setPending([]);
+    renderRecords([]);
+    profileNote.textContent = "Your data was deleted.";
+  } catch (e) {
+    profileNote.textContent = "Couldn't delete right now. Check your connection and try again.";
+  }
+});
+
+// Start-up: an invite link (?join=CODE) opens the join flow; otherwise resume an online
+// game left open, or show the new-game dialog.
+(async function boot() {
+  const params = new URLSearchParams(location.search);
+  const joinCode = cleanCode(params.get("join") || "");
+  if (params.has("join")) history.replaceState(null, "", location.pathname);
+  let resume = null;
+  try { resume = localStorage.getItem("game9-online"); } catch (e) {}
+  if (joinCode.length === 5) {
+    openSetup();
+    form.mode.value = "online";
+    joinInput.value = joinCode;
+    syncSetup();
+    return;
+  }
+  if (resume) {
+    try {
+      const g = await loadGame(resume);
+      if ((g.red === myId || g.blue === myId) && (g.status === "playing" || g.status === "waiting")) return enterOnline(g);
+    } catch (e) {}
+    try { localStorage.removeItem("game9-online"); } catch (e) {}
+  }
+  openSetup();
+})();
 </script>
 </body>
 </html>
